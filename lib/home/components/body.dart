@@ -162,8 +162,9 @@ class _BodyState extends State<Body> {
          'photo' : await MultipartFile.fromFile(photo.path, filename:photo.path.split('/').last),
          'video' : await MultipartFile.fromFile(video.path, filename:video.path.split('/').last),
        });
+       print(formData.fields);
        final Response response = await dio.post(
-         'https://crm.mygeeks.net.au/api/v1/my_tasks_reschedule',
+         'https://crm.mygeeks.net.au/api/v1/add_job_sheet',
          data: formData,
          onSendProgress: (int sent, int total) {
            print('${sent / total}');
@@ -172,6 +173,7 @@ class _BodyState extends State<Body> {
        );
        if(response.statusCode == 200){
          var responseData = jsonDecode(jsonEncode(response.data)) as Map;
+         print(response.data);
          EasyLoading.showInfo("${responseData['message']}");
        }else{
          EasyLoading.showError("Missing Data");
@@ -1492,7 +1494,7 @@ class _BodyState extends State<Body> {
                                                                             color:
                                                                             Colors.white),
                                                                       ),
-                                                                      onPressed: () {
+                                                                      onPressed: () async {
                                                                         EasyLoading
                                                                             .show();
                                                                         print(photo
@@ -1504,12 +1506,16 @@ class _BodyState extends State<Body> {
                                                                                 .text);
                                                                         print(
                                                                             dropdownValue);
+                                                                        final SharedPreferences prefs = await SharedPreferences.getInstance();
+                                                                        var user = json.decode(prefs.getString('user')!) as Map;
+                                                                        print("user");
+                                                                        print(user);
                                                                         _saveJobSheet(
                                                                             job_id: dataSnapshot.data!.data!.appointmentsFollowUps![index].commentsJobId,
-                                                                            comment_id: dataSnapshot.data!.data!.appointmentsFollowUps![index].commentId,
+                                                                            comment_id: dataSnapshot.data!.data!.appointmentsFollowUps![index].followUpsCommentId,
                                                                             comment_notes: _notesController.text,
                                                                             status: dropdownValue.toLowerCase(),
-                                                                            user_id: 1,
+                                                                            user_id: user['id'],
                                                                             photo: photo,
                                                                             video: cameraVideo
                                                                         );
@@ -1517,6 +1523,7 @@ class _BodyState extends State<Body> {
                                                                             .dismiss();
 
                                                                         Navigator.of(context).pop();
+                                                                        _notesController.text = "";
                                                                       },
                                                                       style: ElevatedButton
                                                                           .styleFrom(
