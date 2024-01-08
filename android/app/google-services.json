@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "328790078986",
+    "project_id": "agent-app-48e97",
+    "storage_bucket": "agent-app-48e97.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:328790078986:android:eb56e6901156a1ff7651f3",
+        "android_client_info": {
+          "package_name": "com.digitalgeeks.agent.digital_geeks_agent"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDaa8DiWAFd_JoIBGfoJYLesgQ00geAR5A"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
