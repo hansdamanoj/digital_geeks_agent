@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 import 'package:auto_size_text/auto_size_text.dart';
+import 'package:digital_geeks_agent/model/AllJobSheets.dart';
 import 'package:digital_geeks_agent/model/MyTasks.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
@@ -14,6 +15,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:shimmer/shimmer.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:video_player/video_player.dart';
+import 'package:intl/intl.dart';
 
 const List<String> list = <String>['Resolved', 'Pending', 'Closed'];
 
@@ -39,7 +41,8 @@ class _BodyState extends State<Body> {
   late VideoPlayerController _controller;
   final TextEditingController _notesController = TextEditingController();
   final GlobalKey<LiquidPullToRefreshState> _refreshIndicatorKey =
-  GlobalKey<LiquidPullToRefreshState>();
+      GlobalKey<LiquidPullToRefreshState>();
+  late VideoPlayerController _videoController;
 
   Future<MyTasks?> _getAgentTasks() async {
     // EasyLoading.show();
@@ -47,12 +50,12 @@ class _BodyState extends State<Body> {
     try {
       final SharedPreferences prefs = await SharedPreferences.getInstance();
       // Save an String value to 'action' key.
-      var userJson = json.decode(prefs.getString('user')!);
+      var userJson = json.decode(prefs.getString('user')!) as Map;
 
       final formData = FormData.fromMap({
-        'privilege': 'a',
+        'privilege': userJson['privillage'],
         'date': DateTime.now().toIso8601String(),
-        'id': 1,
+        'id': userJson['id'],
       });
       final Response response = await dio.post(
         'https://crm.mygeeks.net.au/api/v1/my_tasks',
@@ -71,6 +74,48 @@ class _BodyState extends State<Body> {
           _apiHasData = true;
         });
         return MyTasks.fromJson(response.data);
+      } else {
+        return null;
+      }
+    } catch (e, s) {
+      print(e);
+      print(s);
+      EasyLoading.showInfo("$e");
+    }
+    return null;
+  }
+
+  Future<AllJobSheets?> _getAllJobSheets({commentId, jobId}) async {
+    // EasyLoading.show();
+    //Call the Api and assign data to future
+    try {
+      final SharedPreferences prefs = await SharedPreferences.getInstance();
+      // Save an String value to 'action' key.
+      var userJson = json.decode(prefs.getString('user')!) as Map;
+      print(userJson);
+
+      final formData = FormData.fromMap({
+        'id': commentId,
+        'job_id': jobId,
+        'user_id': userJson['id'],
+      });
+      final Response response = await dio.post(
+        'https://crm.mygeeks.net.au/api/v1/get_job_sheet',
+        data: formData,
+        onSendProgress: (int sent, int total) {
+          print('${sent / total}');
+          EasyLoading.showProgress(sent / total);
+        },
+      );
+      if (response.statusCode == 200) {
+        var responseData = json.decode(json.encode(response.data)) as Map;
+        print(responseData);
+        if (responseData['data'].length > 0) {
+          EasyLoading.dismiss();
+          return AllJobSheets.fromJson(response.data);
+        } else {
+          return null;
+        }
       } else {
         return null;
       }
@@ -150,47 +195,53 @@ class _BodyState extends State<Body> {
     EasyLoading.dismiss();
   }
 
-  _saveJobSheet({job_id, comment_id, comment_notes, status, user_id, video, photo}) async {
-   try{
-     if(photo != null && video != null){
-       final formData = FormData.fromMap({
-         'job_id': job_id,
-         'comment_id': comment_id,
-         'comment_notes': comment_notes,
-         'status': status,
-         'user_id': user_id,
-         'photo' : await MultipartFile.fromFile(photo.path, filename:photo.path.split('/').last),
-         'video' : await MultipartFile.fromFile(video.path, filename:video.path.split('/').last),
-       });
-       print(formData.fields);
-       final Response response = await dio.post(
-         'https://crm.mygeeks.net.au/api/v1/add_job_sheet',
-         data: formData,
-         onSendProgress: (int sent, int total) {
-           print('${sent / total}');
-           EasyLoading.showProgress(sent / total);
-         },
-       );
-       if(response.statusCode == 200){
-         var responseData = jsonDecode(jsonEncode(response.data)) as Map;
-         print(response.data);
-         EasyLoading.showInfo("${responseData['message']}");
-       }else{
-         EasyLoading.showError("Missing Data");
-       }
-     }else{
-       EasyLoading.showError("Please snap a picture and a video");
-     }
-   }catch(e){
-     EasyLoading.showError(e.toString());
-   }
+  _saveJobSheet({
+      job_id,
+      comment_id,
+      comment_notes,
+      status,
+      user_id,
+      video,
+      photo}) async {
+    try {
+      if (photo != null && video != null) {
+        final formData = FormData.fromMap({
+          'job_id': job_id,
+          'comment_id': comment_id,
+          'comment_notes': comment_notes,
+          'status': status,
+          'user_id': user_id,
+          'photo': await MultipartFile.fromFile(photo.path,
+              filename: photo.path.split('/').last),
+          'video': await MultipartFile.fromFile(video.path,
+              filename: video.path.split('/').last),
+        });
+        print(formData.fields);
+        final Response response = await dio.post(
+          'https://crm.mygeeks.net.au/api/v1/add_job_sheet',
+          data: formData,
+          onSendProgress: (int sent, int total) {
+            print('${sent / total}');
+            EasyLoading.showProgress(sent / total);
+          },
+        );
+        if (response.statusCode == 200) {
+          var responseData = jsonDecode(jsonEncode(response.data)) as Map;
+          print(response.data);
+          EasyLoading.showInfo("${responseData['message']}");
+        } else {
+          EasyLoading.showError("Missing Data");
+        }
+      } else {
+        EasyLoading.showError("Please snap a picture and a video");
+      }
+    } catch (e) {
+      EasyLoading.showError(e.toString());
+    }
   }
 
-
   acceptTask({followup_id}) async {
-    final formData = FormData.fromMap({
-      'followup_id': followup_id
-    });
+    final formData = FormData.fromMap({'followup_id': followup_id});
     final Response response = await dio.post(
       'https://crm.mygeeks.net.au/api/v1/my_tasks_accept',
       data: formData,
@@ -199,17 +250,16 @@ class _BodyState extends State<Body> {
         EasyLoading.showProgress(sent / total);
       },
     );
-    if(response.statusCode == 200){
+    if (response.statusCode == 200) {
       var responseData = jsonDecode(jsonEncode(response.data)) as Map;
       EasyLoading.showInfo("${responseData['message']}");
-    }else{
+    } else {
       EasyLoading.showError("Missing Data");
     }
   }
+
   rejectTask({followup_id}) async {
-    final formData = FormData.fromMap({
-      'followup_id': followup_id
-    });
+    final formData = FormData.fromMap({'followup_id': followup_id});
     final Response response = await dio.post(
       'https://crm.mygeeks.net.au/api/v1/my_tasks_reject',
       data: formData,
@@ -218,10 +268,10 @@ class _BodyState extends State<Body> {
         EasyLoading.showProgress(sent / total);
       },
     );
-    if(response.statusCode == 200){
+    if (response.statusCode == 200) {
       var responseData = jsonDecode(jsonEncode(response.data)) as Map;
       EasyLoading.showInfo("${responseData['message']}");
-    }else{
+    } else {
       EasyLoading.showError("Missing Data");
     }
   }
@@ -235,6 +285,12 @@ class _BodyState extends State<Body> {
   @override
   void initState() {
     super.initState();
+    _videoController = VideoPlayerController.networkUrl(Uri.parse(
+        'https://flutter.github.io/assets-for-api-docs/assets/videos/bee.mp4'))
+      ..initialize().then((_) {
+        // Ensure the first frame is shown after the video is initialized, even before the play button has been pressed.
+        setState(() {});
+      });
     // WidgetsBinding.instance.addPostFrameCallback((_) => _getAgentTasks());
     allTasks = _getAgentTasks();
     _controller = VideoPlayerController.networkUrl(Uri.parse(
@@ -255,7 +311,7 @@ class _BodyState extends State<Body> {
   @override
   Widget build(BuildContext context) {
     return LiquidPullToRefresh(
-      key: _refreshIndicatorKey,	// key if you want to add
+      key: _refreshIndicatorKey, // key if you want to add
       onRefresh: _handleRefresh,
       showChildOpacityTransition: true,
       child: Padding(
@@ -284,7 +340,8 @@ class _BodyState extends State<Body> {
                                     children: [
                                       AutoSizeText(
                                         "Total Assigned tasks",
-                                        style: GoogleFonts.aBeeZee(fontSize: 20),
+                                        style:
+                                            GoogleFonts.aBeeZee(fontSize: 20),
                                         overflow: TextOverflow.ellipsis,
                                       ),
                                       AutoSizeText("$_apiHasDataCount",
@@ -392,8 +449,8 @@ class _BodyState extends State<Body> {
                 padding: const EdgeInsets.symmetric(horizontal: 10.0),
                 child: Align(
                     alignment: Alignment.centerLeft,
-                    child:
-                        Text("Tasks", style: GoogleFonts.aBeeZee(fontSize: 22))),
+                    child: Text("Tasks",
+                        style: GoogleFonts.aBeeZee(fontSize: 22))),
               ),
               const SizedBox(
                 height: 5,
@@ -423,7 +480,11 @@ class _BodyState extends State<Body> {
                         print(
                             "${dataSnapshot.data!.data!.followUps![index].salesClientFname}");
                         children.add(Card(
-                          color: dataSnapshot.data!.data!.followUps![index].accepted == 'yes' ? Colors.white70 : Colors.white,
+                          color: dataSnapshot
+                                      .data!.data!.followUps![index].accepted ==
+                                  'yes'
+                              ? Colors.white70
+                              : Colors.white,
                           child: SizedBox(
                               height: 260.0,
                               width: 350,
@@ -439,12 +500,120 @@ class _BodyState extends State<Body> {
                                           crossAxisAlignment:
                                               CrossAxisAlignment.start,
                                           children: [
-                                            Text(
-                                                "${dataSnapshot.data!.data!.followUps![index].salesClientFname}",
-                                                style: GoogleFonts.aBeeZee(
-                                                    fontSize: 22,
-                                                    color: Colors.black54,
-                                                    fontWeight: FontWeight.w900)),
+                                            GestureDetector(
+                                              onTap: () {
+                                                showCupertinoModalBottomSheet(
+                                                    context: context,
+                                                    builder: (context) =>
+                                                        StatefulBuilder(builder:
+                                                            (BuildContext
+                                                        context,
+                                                            StateSetter
+                                                            setState /*You can rename this!*/) {
+                                                          return SizedBox(
+                                                            height: MediaQuery.of(context)
+                                                                .size
+                                                                .height *
+                                                                0.85,
+                                                            child:
+                                                            Padding(
+                                                                padding: const EdgeInsets.all(15),
+                                                                child: FutureBuilder<AllJobSheets?>(
+                                                                    future: _getAllJobSheets(
+                                                                        commentId: dataSnapshot
+                                                                            .data!
+                                                                            .data!
+                                                                            .followUps![
+                                                                        index]
+                                                                            .commentId,
+                                                                        jobId: dataSnapshot
+                                                                            .data!
+                                                                            .data!
+                                                                            .followUps![
+                                                                        index]
+                                                                            .commentsJobId),
+                                                                    builder: (context, snapshot) {
+                                                                      if(snapshot.hasData) {
+                                                                        _videoController = VideoPlayerController.networkUrl(Uri.parse(
+                                                                            "${snapshot.data!.data![index].videoUrl}"));
+                                                                        return ListView.builder(
+                                                                          itemCount:
+                                                                          snapshot.data!.data?.length,
+                                                                          itemBuilder: (context, index) => Padding(
+                                                                            padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 10),
+                                                                            child: Card(
+                                                                                child: Padding(
+                                                                                  padding: const EdgeInsets.all(15.0),
+                                                                                  child: Column(
+                                                                                    children: [
+                                                                                      Row(
+                                                                                        children: [
+                                                                                          Expanded(child: AutoSizeText("Job Sheet #${snapshot.data!.data![index].id}", style: GoogleFonts.abel(fontSize: 20, fontWeight: FontWeight.w900, color: Colors.blue),)),],
+                                                                                      ),
+                                                                                      Row(
+                                                                                        children: [
+                                                                                          Expanded(child: AutoSizeText("${snapshot.data!.data![index].notes}")),
+                                                                                        ],
+                                                                                      ),
+                                                                                      Row(
+                                                                                        children: [
+                                                                                          Expanded(child: AutoSizeText(DateFormat('dd-MMMM-yyyy hh:mm:ss').format(DateTime.parse(snapshot.data!.data![index].createdAt!)))),
+                                                                                        ],
+                                                                                      ),
+                                                                                      const SizedBox(height: 20,),
+                                                                                      Row(
+                                                                                        children: [
+                                                                                          Expanded(child: Image.network(
+                                                                                            "${snapshot.data!.data![index].pictureUrl}",
+                                                                                            // When image is loading from the server it takes some time
+                                                                                            // So we will show progress indicator while loading
+                                                                                            loadingBuilder: (BuildContext context, Widget child,
+                                                                                                ImageChunkEvent? loadingProgress) {
+                                                                                              if (loadingProgress == null) return child;
+                                                                                              return Center(
+                                                                                                child: CircularProgressIndicator(
+                                                                                                  value: loadingProgress.expectedTotalBytes != null
+                                                                                                      ? loadingProgress.cumulativeBytesLoaded /
+                                                                                                      loadingProgress.expectedTotalBytes!
+                                                                                                      : null,
+                                                                                                ),
+                                                                                              );
+                                                                                            },
+                                                                                          )),
+                                                                                          Expanded(child: _videoController.value.isInitialized
+                                                                                              ? AspectRatio(
+                                                                                            aspectRatio: _videoController.value.aspectRatio,
+                                                                                            child: VideoPlayer(_videoController),
+                                                                                          ): Container()),
+                                                                                        ],
+                                                                                      ),
+                                                                                      const SizedBox(height: 20,),
+                                                                                      Row(
+                                                                                        children: [
+                                                                                          Expanded(child: AutoSizeText("${snapshot.data!.data![index].status}")),
+                                                                                        ],
+                                                                                      ),
+                                                                                    ],
+                                                                                  ),
+                                                                                )
+                                                                            ),
+                                                                          ),
+                                                                        );
+                                                                      } else {
+                                                                        return const AutoSizeText("No data");
+                                                                      }
+                                                                    })),
+                                                          );
+                                                        }));
+                                              },
+                                              child: Text(
+                                                  "${dataSnapshot.data!.data!.followUps![index].salesClientFname}",
+                                                  style: GoogleFonts.aBeeZee(
+                                                      fontSize: 22,
+                                                      color: Colors.black54,
+                                                      fontWeight:
+                                                          FontWeight.w900)),
+                                            ),
                                             Text(
                                                 "${dataSnapshot.data!.data!.followUps![index].salesAddress1}",
                                                 style: GoogleFonts.aBeeZee(
@@ -492,487 +661,703 @@ class _BodyState extends State<Body> {
                                                     color: Colors.black54)),
                                           ],
                                         )),
-                                    dataSnapshot.data!.data!.followUps![index].status == 'inprogress' ? Expanded(
-                                        flex: 1,
-                                        child: Column(
-                                          children: [
-                                            GestureDetector(
-                                                onTap: () {
-                                                  EasyLoading.show();
-                                                  getLatAndLongitude(
-                                                          "${dataSnapshot.data!.data!.followUps![index].salesAddress1}, ${dataSnapshot.data!.data!.followUps![index].salesAddress2}, ${dataSnapshot.data!.data!.followUps![index].salesCity}, ${dataSnapshot.data!.data!.followUps![index].salesState}, ${dataSnapshot.data!.data!.followUps![index].salesPinCode}")
-                                                      .then((value) =>
-                                                          _launchMapsUrl(
-                                                              value[0].latitude,
-                                                              value[0]
-                                                                  .longitude));
-                                                },
-                                                child: Icon(
-                                                  Icons.location_pin,
-                                                  color: Colors.blue[400],
-                                                )),
-                                            AutoSizeText(
-                                              "Open Maps",
-                                              style:
-                                                  GoogleFonts.abel(fontSize: 10),
-                                            ),
-                                            dataSnapshot
-                                                        .data!
-                                                        .data!
-                                                        .followUps![index]
-                                                        .accepted ==
-                                                    'no'
-                                                ? GestureDetector(
+                                    dataSnapshot.data!.data!.followUps![index]
+                                                .status ==
+                                            'inprogress'
+                                        ? Expanded(
+                                            flex: 1,
+                                            child: Column(
+                                              children: [
+                                                GestureDetector(
                                                     onTap: () {
-                                                      EasyLoading.showInfo(
-                                                          "Accepting task");
-                                                      acceptTask(followup_id: dataSnapshot.data!.data!.followUps![index].id);
+                                                      EasyLoading.show();
+                                                      getLatAndLongitude(
+                                                              "${dataSnapshot.data!.data!.followUps![index].salesAddress1}, ${dataSnapshot.data!.data!.followUps![index].salesAddress2}, ${dataSnapshot.data!.data!.followUps![index].salesCity}, ${dataSnapshot.data!.data!.followUps![index].salesState}, ${dataSnapshot.data!.data!.followUps![index].salesPinCode}")
+                                                          .then((value) =>
+                                                              _launchMapsUrl(
+                                                                  value[0]
+                                                                      .latitude,
+                                                                  value[0]
+                                                                      .longitude));
                                                     },
                                                     child: Icon(
-                                                      Icons.check_box_outlined,
+                                                      Icons.location_pin,
                                                       color: Colors.blue[400],
-                                                    ),
-                                                  )
-                                                : Container(),
-                                            dataSnapshot
-                                                        .data!
-                                                        .data!
-                                                        .followUps![index]
-                                                        .accepted ==
-                                                    'no'
-                                                ? AutoSizeText(
-                                                    "Accept",
-                                                    style: GoogleFonts.abel(
-                                                        fontSize: 10),
-                                                  )
-                                                : Container(),
-                                            dataSnapshot
-                                                        .data!
-                                                        .data!
-                                                        .followUps![index]
-                                                        .accepted ==
-                                                    'yes'
-                                                ? GestureDetector(
-                                                    onTap: () {
-                                                      rejectTask(followup_id : 1);
-                                                      EasyLoading.showInfo(
-                                                          "Rejecting task");
-                                                    },
-                                                    child: Icon(
-                                                      Icons.crop_square_sharp,
-                                                      color: Colors.blue[400],
-                                                    ),
-                                                  )
-                                                : Container(),
-                                            dataSnapshot
-                                                        .data!
-                                                        .data!
-                                                        .followUps![index]
-                                                        .accepted ==
-                                                    'yes'
-                                                ? AutoSizeText(
-                                                    "Reject",
-                                                    style: GoogleFonts.abel(
-                                                        fontSize: 10),
-                                                  )
-                                                : Container(),
-                                            GestureDetector(
-                                              onTap: () {
-                                                _selectDate(context)
-                                                    .then((value) {
-                                                  rescheduleAppointment(
-                                                      value,
-                                                      dataSnapshot
-                                                          .data!
-                                                          .data!
-                                                          .followUps![index]
-                                                          .salesId);
-                                                  return value;
-                                                });
-                                              },
-                                              child: Icon(
-                                                Icons.calendar_month_sharp,
-                                                color: Colors.blue[400],
-                                              ),
-                                            ),
-                                            AutoSizeText(
-                                              "Reschedule",
-                                              style:
-                                                  GoogleFonts.abel(fontSize: 10),
-                                            ),
-                                            GestureDetector(
-                                              onTap: () {
-                                                EasyLoading.show();
-                                                _makePhoneCall(
-                                                    'tel:${dataSnapshot.data!.data!.followUps![index].salesMobile}');
-                                              },
-                                              child: Icon(
-                                                Icons.phone,
-                                                color: Colors.blue[400],
-                                              ),
-                                            ),
-                                            AutoSizeText(
-                                              "Call",
-                                              style:
-                                                  GoogleFonts.abel(fontSize: 10),
-                                            ),
-                                            GestureDetector(
-                                              onTap: () {
-                                                showCupertinoModalBottomSheet(
-                                                  context: context,
-                                                  builder: (context) =>
-                                                      StatefulBuilder(builder:
-                                                          (BuildContext context,
-                                                              StateSetter
-                                                                  setState /*You can rename this!*/) {
-                                                    return Container(
-                                                      height:
-                                                          MediaQuery.of(context)
+                                                    )),
+                                                AutoSizeText(
+                                                  "Open Maps",
+                                                  style: GoogleFonts.abel(
+                                                      fontSize: 10),
+                                                ),
+                                                dataSnapshot
+                                                            .data!
+                                                            .data!
+                                                            .followUps![index]
+                                                            .accepted ==
+                                                        'no'
+                                                    ? GestureDetector(
+                                                        onTap: () {
+                                                          EasyLoading.showInfo(
+                                                              "Accepting task");
+                                                          acceptTask(
+                                                              followup_id:
+                                                                  dataSnapshot
+                                                                      .data!
+                                                                      .data!
+                                                                      .followUps![
+                                                                          index]
+                                                                      .id);
+                                                        },
+                                                        child: Icon(
+                                                          Icons
+                                                              .check_box_outlined,
+                                                          color:
+                                                              Colors.blue[400],
+                                                        ),
+                                                      )
+                                                    : Container(),
+                                                dataSnapshot
+                                                            .data!
+                                                            .data!
+                                                            .followUps![index]
+                                                            .accepted ==
+                                                        'no'
+                                                    ? AutoSizeText(
+                                                        "Accept",
+                                                        style: GoogleFonts.abel(
+                                                            fontSize: 10),
+                                                      )
+                                                    : Container(),
+                                                dataSnapshot
+                                                            .data!
+                                                            .data!
+                                                            .followUps![index]
+                                                            .accepted ==
+                                                        'yes'
+                                                    ? GestureDetector(
+                                                        onTap: () {
+                                                          rejectTask(
+                                                              followup_id: 1);
+                                                          EasyLoading.showInfo(
+                                                              "Rejecting task");
+                                                        },
+                                                        child: Icon(
+                                                          Icons
+                                                              .crop_square_sharp,
+                                                          color:
+                                                              Colors.blue[400],
+                                                        ),
+                                                      )
+                                                    : Container(),
+                                                dataSnapshot
+                                                            .data!
+                                                            .data!
+                                                            .followUps![index]
+                                                            .accepted ==
+                                                        'yes'
+                                                    ? AutoSizeText(
+                                                        "Reject",
+                                                        style: GoogleFonts.abel(
+                                                            fontSize: 10),
+                                                      )
+                                                    : Container(),
+                                                GestureDetector(
+                                                  onTap: () {
+                                                    _selectDate(context)
+                                                        .then((value) {
+                                                      rescheduleAppointment(
+                                                          value,
+                                                          dataSnapshot
+                                                              .data!
+                                                              .data!
+                                                              .followUps![index]
+                                                              .salesId);
+                                                      return value;
+                                                    });
+                                                  },
+                                                  child: Icon(
+                                                    Icons.calendar_month_sharp,
+                                                    color: Colors.blue[400],
+                                                  ),
+                                                ),
+                                                AutoSizeText(
+                                                  "Reschedule",
+                                                  style: GoogleFonts.abel(
+                                                      fontSize: 10),
+                                                ),
+                                                GestureDetector(
+                                                  onTap: () {
+                                                    EasyLoading.show();
+                                                    _makePhoneCall(
+                                                        'tel:${dataSnapshot.data!.data!.followUps![index].salesMobile}');
+                                                  },
+                                                  child: Icon(
+                                                    Icons.phone,
+                                                    color: Colors.blue[400],
+                                                  ),
+                                                ),
+                                                AutoSizeText(
+                                                  "Call",
+                                                  style: GoogleFonts.abel(
+                                                      fontSize: 10),
+                                                ),
+                                                GestureDetector(
+                                                  onTap: () {
+                                                    showCupertinoModalBottomSheet(
+                                                      context: context,
+                                                      builder: (context) =>
+                                                          StatefulBuilder(builder:
+                                                              (BuildContext
+                                                                      context,
+                                                                  StateSetter
+                                                                      setState /*You can rename this!*/) {
+                                                        return Container(
+                                                          height: MediaQuery.of(
+                                                                      context)
                                                                   .size
                                                                   .height *
                                                               0.85,
-                                                      child: Padding(
-                                                        padding:
-                                                            const EdgeInsets.all(
-                                                                15.0),
-                                                        child:
-                                                            SingleChildScrollView(
-                                                          child: Column(
-                                                            crossAxisAlignment:
-                                                                CrossAxisAlignment
-                                                                    .center,
-                                                            children: [
-                                                              AutoSizeText(
-                                                                "Add a job sheet",
-                                                                style: GoogleFonts.abel(
-                                                                    fontSize: 25,
-                                                                    fontWeight:
-                                                                        FontWeight
-                                                                            .w900),
-                                                              ),
-                                                              const SizedBox(
-                                                                height: 20,
-                                                              ),
-                                                              AutoSizeText(
-                                                                "${dataSnapshot.data!.data!.followUps![index].commentsComment}",
-                                                                style: GoogleFonts.abel(
-                                                                    fontSize: 15,
-                                                                    fontWeight:
-                                                                        FontWeight
-                                                                            .w400),
-                                                              ),
-                                                              const SizedBox(
-                                                                height: 20,
-                                                              ),
-                                                              TextFormField(
-                                                                controller:
-                                                                    _notesController,
-                                                                maxLines: 10,
-                                                                decoration:
-                                                                    const InputDecoration(
-                                                                  border: OutlineInputBorder(
-                                                                      borderSide:
-                                                                          BorderSide(
-                                                                              color:
-                                                                                  Colors.teal)),
-                                                                  // hintText: 'Tell us about yourself',
-                                                                  helperText:
-                                                                      'Mention all the efforts made for the task',
-                                                                  labelText:
-                                                                      'Notes',
-                                                                  // prefixIcon:
-                                                                  //     Icon(
-                                                                  //   Icons
-                                                                  //       .note_alt_outlined,
-                                                                  //   color: Colors
-                                                                  //       .green,
-                                                                  // ),
-                                                                  // prefixText:
-                                                                  //     ' ',
-                                                                  // suffixText:
-                                                                  //     'USD',
-                                                                  // suffixStyle:
-                                                                  //     TextStyle(
-                                                                  //         color:
-                                                                  //             Colors.green)
-                                                                ),
-                                                              ),
-                                                              const SizedBox(
-                                                                height: 20,
-                                                              ),
-                                                              DropdownButton<
-                                                                  String>(
-                                                                hint:
-                                                                    const AutoSizeText(
-                                                                        "Status"),
-                                                                value:
-                                                                    dropdownValue,
-                                                                isExpanded: true,
-                                                                icon: const Icon(Icons
-                                                                    .arrow_downward),
-                                                                elevation: 16,
-                                                                style: const TextStyle(
-                                                                    color: Colors
-                                                                        .teal),
-                                                                underline:
-                                                                    Container(
-                                                                  height: 2,
-                                                                  color:
-                                                                      Colors.teal,
-                                                                ),
-                                                                onChanged:
-                                                                    (String?
-                                                                        value) {
-                                                                  // This is called when the user selects an item.
-                                                                  setState(() {
-                                                                    dropdownValue =
-                                                                        value!;
-                                                                  });
-                                                                },
-                                                                items: list.map<
-                                                                    DropdownMenuItem<
-                                                                        String>>((String
-                                                                    value) {
-                                                                  return DropdownMenuItem<
+                                                          child: Padding(
+                                                            padding:
+                                                                const EdgeInsets
+                                                                    .all(15.0),
+                                                            child:
+                                                                SingleChildScrollView(
+                                                              child: Column(
+                                                                crossAxisAlignment:
+                                                                    CrossAxisAlignment
+                                                                        .center,
+                                                                children: [
+                                                                  AutoSizeText(
+                                                                    "Add a job sheet",
+                                                                    style: GoogleFonts.abel(
+                                                                        fontSize:
+                                                                            25,
+                                                                        fontWeight:
+                                                                            FontWeight.w900),
+                                                                  ),
+                                                                  const SizedBox(
+                                                                    height: 20,
+                                                                  ),
+                                                                  AutoSizeText(
+                                                                    "${dataSnapshot.data!.data!.followUps![index].commentsComment}",
+                                                                    style: GoogleFonts.abel(
+                                                                        fontSize:
+                                                                            15,
+                                                                        fontWeight:
+                                                                            FontWeight.w400),
+                                                                  ),
+                                                                  const SizedBox(
+                                                                    height: 20,
+                                                                  ),
+                                                                  TextFormField(
+                                                                    controller:
+                                                                        _notesController,
+                                                                    maxLines:
+                                                                        10,
+                                                                    decoration: const InputDecoration(
+                                                                        border: OutlineInputBorder(borderSide: BorderSide(color: Colors.teal)),
+                                                                        // hintText: 'Tell us about yourself',
+                                                                        helperText: 'Mention all the efforts made for the task',
+                                                                        labelText: 'Notes',
+                                                                        floatingLabelBehavior: FloatingLabelBehavior.always
+                                                                        // prefixIcon:
+                                                                        //     Icon(
+                                                                        //   Icons
+                                                                        //       .note_alt_outlined,
+                                                                        //   color: Colors
+                                                                        //       .green,
+                                                                        // ),
+                                                                        // prefixText:
+                                                                        //     ' ',
+                                                                        // suffixText:
+                                                                        //     'USD',
+                                                                        // suffixStyle:
+                                                                        //     TextStyle(
+                                                                        //         color:
+                                                                        //             Colors.green)
+                                                                        ),
+                                                                  ),
+                                                                  const SizedBox(
+                                                                    height: 20,
+                                                                  ),
+                                                                  DropdownButton<
                                                                       String>(
-                                                                    value: value,
-                                                                    child: Text(
-                                                                        value),
-                                                                  );
-                                                                }).toList(),
-                                                              ),
-                                                              _photoCaptured ==
-                                                                      false
-                                                                  ? IconButton(
-                                                                      iconSize:
-                                                                          100,
+                                                                    hint: const AutoSizeText(
+                                                                        "Status"),
+                                                                    value:
+                                                                        dropdownValue,
+                                                                    isExpanded:
+                                                                        true,
+                                                                    icon: const Icon(
+                                                                        Icons
+                                                                            .arrow_downward),
+                                                                    elevation:
+                                                                        16,
+                                                                    style: const TextStyle(
+                                                                        color: Colors
+                                                                            .teal),
+                                                                    underline:
+                                                                        Container(
+                                                                      height: 2,
+                                                                      color: Colors
+                                                                          .teal,
+                                                                    ),
+                                                                    onChanged:
+                                                                        (String?
+                                                                            value) {
+                                                                      // This is called when the user selects an item.
+                                                                      setState(
+                                                                          () {
+                                                                        dropdownValue =
+                                                                            value!;
+                                                                      });
+                                                                    },
+                                                                    items: list.map<
+                                                                        DropdownMenuItem<
+                                                                            String>>((String
+                                                                        value) {
+                                                                      return DropdownMenuItem<
+                                                                          String>(
+                                                                        value:
+                                                                            value,
+                                                                        child: Text(
+                                                                            value),
+                                                                      );
+                                                                    }).toList(),
+                                                                  ),
+                                                                  _photoCaptured ==
+                                                                          false
+                                                                      ? IconButton(
+                                                                          iconSize:
+                                                                              100,
+                                                                          icon:
+                                                                              const Icon(
+                                                                            Icons.image,
+                                                                            size:
+                                                                                45,
+                                                                          ),
+                                                                          // the method which is called
+                                                                          // when button is pressed
+                                                                          onPressed:
+                                                                              () async {
+                                                                            print("camera pressed");
+                                                                            // Pick an image.
+                                                                            // final XFile? image =
+                                                                            //     await picker.pickImage(
+                                                                            //         source: ImageSource
+                                                                            //             .gallery);
+                                                                            // Capture a photo.
+                                                                            photo =
+                                                                                await picker.pickImage(source: ImageSource.camera).then((value) {
+                                                                              setState(() {
+                                                                                _photoCaptured = true;
+                                                                              });
+                                                                              return value;
+                                                                            });
+                                                                          },
+                                                                        )
+                                                                      : Container(),
+                                                                  _photoCaptured ==
+                                                                          false
+                                                                      ? AutoSizeText(
+                                                                          "Add image",
+                                                                          style: GoogleFonts.abel(
+                                                                              fontSize: 15,
+                                                                              fontWeight: FontWeight.w500),
+                                                                        )
+                                                                      : Container(),
+                                                                  const SizedBox(
+                                                                    height: 10,
+                                                                  ),
+                                                                  _photoCaptured
+                                                                      ? Stack(
+                                                                          children: [
+                                                                            ClipRRect(
+                                                                              borderRadius: const BorderRadius.all(Radius.circular(25)),
+                                                                              child: Image.file(File(photo!.path)),
+                                                                            ),
+                                                                          ],
+                                                                        )
+                                                                      : Container(),
+                                                                  const SizedBox(
+                                                                    height: 10,
+                                                                  ),
+                                                                  !_videoCaptured
+                                                                      ? IconButton(
+                                                                          iconSize:
+                                                                              100,
+                                                                          icon:
+                                                                              const Icon(
+                                                                            Icons.video_camera_back_outlined,
+                                                                            size:
+                                                                                45,
+                                                                          ),
+                                                                          // the method which is called
+                                                                          // when button is pressed
+                                                                          onPressed:
+                                                                              () {
+                                                                            setState(
+                                                                              () async {
+                                                                                // Capture a video.
+                                                                                cameraVideo = await picker.pickVideo(source: ImageSource.camera).then((value) {
+                                                                                  setState(() {
+                                                                                    _controller = VideoPlayerController.file(File(value!.path))
+                                                                                      ..initialize().then((_) {
+                                                                                        // Ensure the first frame is shown after the video is initialized, even before the play button has been pressed.
+                                                                                        setState(() {
+                                                                                          _videoCaptured = true;
+                                                                                          _controller.play();
+                                                                                        });
+                                                                                      });
+                                                                                  });
+                                                                                  return value;
+                                                                                });
+                                                                              },
+                                                                            );
+                                                                          },
+                                                                        )
+                                                                      : Container(),
+                                                                  !_videoCaptured
+                                                                      ? AutoSizeText(
+                                                                          "Add video",
+                                                                          style: GoogleFonts.abel(
+                                                                              fontSize: 15,
+                                                                              fontWeight: FontWeight.w500),
+                                                                        )
+                                                                      : Container(),
+                                                                  const SizedBox(
+                                                                    height: 10,
+                                                                  ),
+                                                                  _videoCaptured &&
+                                                                          _controller
+                                                                              .value
+                                                                              .isInitialized
+                                                                      ? AspectRatio(
+                                                                          aspectRatio: _controller
+                                                                              .value
+                                                                              .aspectRatio,
+                                                                          child:
+                                                                              VideoPlayer(_controller),
+                                                                        )
+                                                                      : Container(),
+                                                                  const SizedBox(
+                                                                    height: 10,
+                                                                  ),
+                                                                  const SizedBox(
+                                                                    height: 30,
+                                                                  ),
+                                                                  SizedBox(
+                                                                    width: MediaQuery.of(context)
+                                                                            .size
+                                                                            .width *
+                                                                        0.75,
+                                                                    height:
+                                                                        40.0,
+                                                                    child:
+                                                                        ElevatedButton
+                                                                            .icon(
                                                                       icon:
                                                                           const Icon(
                                                                         Icons
-                                                                            .image,
-                                                                        size: 45,
+                                                                            .save,
+                                                                        color: Colors
+                                                                            .white,
                                                                       ),
-                                                                      // the method which is called
-                                                                      // when button is pressed
-                                                                      onPressed:
-                                                                          () async {
-                                                                        print(
-                                                                            "camera pressed");
-                                                                        // Pick an image.
-                                                                        // final XFile? image =
-                                                                        //     await picker.pickImage(
-                                                                        //         source: ImageSource
-                                                                        //             .gallery);
-                                                                        // Capture a photo.
-                                                                        photo = await picker
-                                                                            .pickImage(
-                                                                                source: ImageSource.camera)
-                                                                            .then((value) {
-                                                                          setState(
-                                                                              () {
-                                                                            _photoCaptured =
-                                                                                true;
-                                                                          });
-                                                                          return value;
-                                                                        });
-                                                                      },
-                                                                    )
-                                                                  : Container(),
-                                                              _photoCaptured ==
-                                                                      false
-                                                                  ? AutoSizeText(
-                                                                      "Add image",
-                                                                      style: GoogleFonts.abel(
-                                                                          fontSize:
-                                                                              15,
-                                                                          fontWeight:
-                                                                              FontWeight.w500),
-                                                                    )
-                                                                  : Container(),
-                                                              const SizedBox(
-                                                                height: 10,
-                                                              ),
-                                                              _photoCaptured
-                                                                  ? Stack(
-                                                                      children: [
-                                                                        ClipRRect(
-                                                                          borderRadius:
-                                                                              const BorderRadius.all(Radius.circular(25)),
-                                                                          child: Image.file(
-                                                                              File(photo!.path)),
-                                                                        ),
-                                                                      ],
-                                                                    )
-                                                                  : Container(),
-                                                              const SizedBox(
-                                                                height: 10,
-                                                              ),
-                                                              !_videoCaptured ? IconButton(
-                                                                iconSize: 100,
-                                                                icon: const Icon(
-                                                                  Icons
-                                                                      .video_camera_back_outlined,
-                                                                  size: 45,
-                                                                ),
-                                                                // the method which is called
-                                                                // when button is pressed
-                                                                onPressed: () {
-                                                                  setState(
-                                                                    () async {
-                                                                      // Capture a video.
-                                                                      cameraVideo = await picker
-                                                                          .pickVideo(
-                                                                              source: ImageSource
-                                                                                  .camera)
-                                                                          .then(
-                                                                              (value) {
-                                                                        setState(
-                                                                            () {
-                                                                          _controller = VideoPlayerController.file(File(value!
-                                                                              .path))
-                                                                            ..initialize()
-                                                                                .then((_) {
-                                                                              // Ensure the first frame is shown after the video is initialized, even before the play button has been pressed.
-                                                                              setState(() {
-                                                                                _videoCaptured = true;
-                                                                                _controller.play();
-                                                                              });
-                                                                            });
-                                                                        });
-                                                                        return value;
-                                                                      });
-                                                                    },
-                                                                  );
-                                                                },
-                                                              ) : Container(),
-                                                              !_videoCaptured ? AutoSizeText(
-                                                                "Add video",
-                                                                style: GoogleFonts.abel(
-                                                                    fontSize: 15,
-                                                                    fontWeight:
-                                                                        FontWeight
-                                                                            .w500),
-                                                              ) : Container(),
-                                                              const SizedBox(
-                                                                height: 10,
-                                                              ),
-                                                              _videoCaptured &&
-                                                                      _controller
-                                                                          .value
-                                                                          .isInitialized
-                                                                  ? AspectRatio(
-                                                                      aspectRatio:
-                                                                          _controller
-                                                                              .value
-                                                                              .aspectRatio,
-                                                                      child: VideoPlayer(
-                                                                          _controller),
-                                                                    )
-                                                                  : Container(),
-                                                              const SizedBox(
-                                                                height: 10,
-                                                              ),
-                                                              const SizedBox(
-                                                                height: 30,
-                                                              ),
-                                                              SizedBox(
-                                                                width: MediaQuery.of(
-                                                                            context)
-                                                                        .size
-                                                                        .width *
-                                                                    0.75,
-                                                                height: 40.0,
-                                                                child:
-                                                                    ElevatedButton
-                                                                        .icon(
-                                                                  icon:
-                                                                      const Icon(
-                                                                    Icons.save,
-                                                                    color: Colors
-                                                                        .white,
-                                                                  ),
-                                                                  label: Text(
-                                                                    "Save",
-                                                                    style: GoogleFonts
-                                                                        .aBeeZee(
+                                                                      label:
+                                                                          Text(
+                                                                        "Save",
+                                                                        style: GoogleFonts.aBeeZee(
                                                                             color:
                                                                                 Colors.white),
-                                                                  ),
-                                                                  onPressed: () {
-                                                                    EasyLoading
-                                                                        .show();
-                                                                    print(photo
-                                                                        ?.path);
-                                                                    print(cameraVideo
-                                                                        ?.path);
-                                                                    print(
-                                                                        _notesController
+                                                                      ),
+                                                                      onPressed:
+                                                                          () {
+                                                                        EasyLoading
+                                                                            .show();
+                                                                        print(photo
+                                                                            ?.path);
+                                                                        print(cameraVideo
+                                                                            ?.path);
+                                                                        print(_notesController
                                                                             .text);
-                                                                    print(
-                                                                        dropdownValue);
-                                                                    _saveJobSheet(
-                                                                      job_id: dataSnapshot.data!.data!.followUps![index].commentsJobId,
-                                                                      comment_id: dataSnapshot.data!.data!.followUps![index].commentId,
-                                                                      comment_notes: _notesController.text,
-                                                                      status: dropdownValue.toLowerCase(),
-                                                                      user_id: 1,
-                                                                      photo: photo,
-                                                                      video: cameraVideo
-                                                                    );
-                                                                    EasyLoading
-                                                                        .dismiss();
+                                                                        print(
+                                                                            dropdownValue);
+                                                                        _saveJobSheet(
+                                                                            job_id:
+                                                                                dataSnapshot.data!.data!.followUps![index].commentsJobId,
+                                                                            comment_id: dataSnapshot.data!.data!.followUps![index].commentId,
+                                                                            comment_notes: _notesController.text,
+                                                                            status: dropdownValue.toLowerCase(),
+                                                                            user_id: 1,
+                                                                            photo: photo,
+                                                                            video: cameraVideo);
+                                                                        EasyLoading
+                                                                            .dismiss();
 
-                                                                    Navigator.of(context).pop();
-                                                                  },
-                                                                  style: ElevatedButton
-                                                                      .styleFrom(
-                                                                    backgroundColor:
-                                                                        Colors
-                                                                            .green,
-                                                                    shape:
-                                                                        RoundedRectangleBorder(
-                                                                      borderRadius:
-                                                                          BorderRadius.circular(
-                                                                              32.0),
+                                                                        Navigator.of(context)
+                                                                            .pop();
+                                                                      },
+                                                                      style: ElevatedButton
+                                                                          .styleFrom(
+                                                                        backgroundColor:
+                                                                            Colors.green,
+                                                                        shape:
+                                                                            RoundedRectangleBorder(
+                                                                          borderRadius:
+                                                                              BorderRadius.circular(32.0),
+                                                                        ),
+                                                                      ),
                                                                     ),
-                                                                  ),
-                                                                ),
-                                                              )
-                                                            ],
+                                                                  )
+                                                                ],
+                                                              ),
+                                                            ),
                                                           ),
-                                                        ),
-                                                      ),
+                                                        );
+                                                      }),
                                                     );
-                                                  }),
-                                                );
-                                              },
-                                              child: Icon(
-                                                Icons.note_add_outlined,
-                                                color: Colors.blue[400],
-                                              ),
-                                            ),
-                                            AutoSizeText(
-                                              "Add Note",
-                                              style:
-                                                  GoogleFonts.abel(fontSize: 10),
-                                            ),
-                                            GestureDetector(
-                                              onTap: (){
-                                                EasyLoading.showToast("Feature coming soon, meanwhile you can add it by logging in our web version",
-                                                );
-                                              },
-                                              child: Icon(
-                                                Icons.currency_pound,
-                                                color: Colors.blue[400],
-                                              ),
-                                            ),
-                                            AutoSizeText(
-                                              "Add Invoice",
-                                              style:
-                                              GoogleFonts.abel(fontSize: 10),
-                                            ),
-                                          ],
-                                        )) : Container()
+                                                  },
+                                                  child: Icon(
+                                                    Icons.note_add_outlined,
+                                                    color: Colors.blue[400],
+                                                  ),
+                                                ),
+                                                AutoSizeText(
+                                                  "Add Note",
+                                                  style: GoogleFonts.abel(
+                                                      fontSize: 10),
+                                                ),
+                                                GestureDetector(
+                                                  onTap: () {
+                                                    showCupertinoModalBottomSheet(
+                                                        context: context,
+                                                        builder: (context) =>
+                                                            StatefulBuilder(builder:
+                                                                (BuildContext
+                                                                        context,
+                                                                    StateSetter
+                                                                        setState /*You can rename this!*/) {
+                                                              return SizedBox(
+                                                                  height: MediaQuery.of(
+                                                                              context)
+                                                                          .size
+                                                                          .height *
+                                                                      0.85,
+                                                                  child: Padding(
+                                                                    padding: const EdgeInsets.all(15.0),
+                                                                    child: Column(
+                                                                      crossAxisAlignment:
+                                                                          CrossAxisAlignment
+                                                                              .center,
+                                                                      children: [
+                                                                        Text(
+                                                                            "Add an Invoice",
+                                                                            style: GoogleFonts.abel(
+                                                                          fontSize: 30,
+                                                                          fontWeight: FontWeight.bold),
+                                                                          ),
+                                                                        const SizedBox(
+                                                                          height:
+                                                                          20,
+                                                                        ),
+                                                                        TextFormField(
+                                                                          controller:
+                                                                          _notesController,
+                                                                          maxLines:
+                                                                          1,
+                                                                          decoration:
+                                                                          InputDecoration(
+                                                                            border: OutlineInputBorder(
+                                                                              borderRadius: BorderRadius.circular(15.0),
+                                                                            ),
+                                                                            // hintText: 'Tell us about yourself',
+                                                                            labelText: 'Service Charge',
+                                                                            labelStyle: GoogleFonts.abel(),
+                                                                            floatingLabelBehavior: FloatingLabelBehavior.always,
+                                                                            contentPadding: const EdgeInsets.all(5.0),
+                                                                          ),
+                                                                        ),
+                                                                        const SizedBox(
+                                                                          height:
+                                                                          20,
+                                                                        ),
+                                                                        TextFormField(
+                                                                          controller:
+                                                                          _notesController,
+                                                                          maxLines:
+                                                                          1,
+                                                                          decoration:
+                                                                          InputDecoration(
+                                                                            border: OutlineInputBorder(
+                                                                              borderRadius: BorderRadius.circular(15.0),
+                                                                            ),
+                                                                            // hintText: 'Tell us about yourself',
+                                                                            labelText: 'Hours Spent',
+                                                                            labelStyle: GoogleFonts.abel(),
+                                                                            floatingLabelBehavior: FloatingLabelBehavior.always,
+                                                                            contentPadding: const EdgeInsets.all(5.0),
+                                                                          ),
+                                                                        ),
+                                                                        const SizedBox(
+                                                                          height:
+                                                                          20,
+                                                                        ),
+                                                                        TextFormField(
+                                                                          controller:
+                                                                          _notesController,
+                                                                          maxLines:
+                                                                          1,
+                                                                          decoration:
+                                                                          InputDecoration(
+                                                                            border: OutlineInputBorder(
+                                                                              borderRadius: BorderRadius.circular(15.0),
+                                                                            ),
+                                                                            // hintText: 'Tell us about yourself',
+                                                                            labelText: 'Visiting Fee',
+                                                                            labelStyle: GoogleFonts.abel(),
+                                                                            floatingLabelBehavior: FloatingLabelBehavior.always,
+                                                                            contentPadding: const EdgeInsets.all(5.0),
+                                                                          ),
+                                                                        ),
+                                                                        const SizedBox(
+                                                                          height:
+                                                                          20,
+                                                                        ),
+                                                                        TextFormField(
+                                                                          controller:
+                                                                          _notesController,
+                                                                          maxLines:
+                                                                          1,
+                                                                          decoration:
+                                                                          InputDecoration(
+                                                                            border: OutlineInputBorder(
+                                                                              borderRadius: BorderRadius.circular(15.0),
+                                                                            ),
+                                                                            // hintText: 'Tell us about yourself',
+                                                                            labelText: 'Discount Percentage',
+                                                                            labelStyle: GoogleFonts.abel(),
+                                                                            floatingLabelBehavior: FloatingLabelBehavior.always,
+                                                                            contentPadding: const EdgeInsets.all(5.0),
+                                                                          ),
+                                                                        ),
+                                                                        CheckboxListTile(
+                                                                          title:
+                                                                          Text(
+                                                                            "GST Applicable",
+                                                                            style: GoogleFonts.abel(),
+                                                                          ),
+                                                                          subtitle:
+                                                                          Text(
+                                                                            "10%",
+                                                                            style: GoogleFonts.sourceCodePro(color: Colors.green),
+                                                                          ),
+                                                                          value:
+                                                                          false,
+                                                                          onChanged:
+                                                                              (newValue) {
+                                                                            setState(() {
+                                                                              // checkedValue = newValue;
+                                                                            });
+                                                                          },
+                                                                          controlAffinity:
+                                                                          ListTileControlAffinity.leading, //  <-- leading Checkbox
+                                                                        ),
+                                                                        CheckboxListTile(
+                                                                          title:
+                                                                          Text(
+                                                                            "Card Processing Applicable",
+                                                                            style: GoogleFonts.abel(),
+                                                                          ),
+                                                                          subtitle:
+                                                                          Text(
+                                                                            "2.5% fee",
+                                                                            style: GoogleFonts.sourceCodePro(color: Colors.green),
+                                                                          ),
+                                                                          value:
+                                                                          false,
+                                                                          onChanged:
+                                                                              (newValue) {
+                                                                            setState(() {
+                                                                              // checkedValue = newValue;
+                                                                            });
+                                                                          },
+                                                                          controlAffinity:
+                                                                          ListTileControlAffinity.leading, //  <-- leading Checkbox
+                                                                        ),
+                                                                        const SizedBox(
+                                                                          height:
+                                                                          20,
+                                                                        ),
+                                                                        TextFormField(
+                                                                          readOnly:
+                                                                          true,
+                                                                          controller:
+                                                                          _notesController,
+                                                                          maxLines:
+                                                                          1,
+                                                                          decoration:
+                                                                          InputDecoration(
+                                                                            border: OutlineInputBorder(
+                                                                              borderRadius: BorderRadius.circular(15.0),
+                                                                            ),
+                                                                            // hintText: 'Tell us about yourself',
+                                                                            labelText: 'Total Amount',
+                                                                            floatingLabelBehavior: FloatingLabelBehavior.always,
+                                                                            contentPadding: const EdgeInsets.all(5.0),
+                                                                          ),
+                                                                        ),
+                                                                        const SizedBox(
+                                                                          height:
+                                                                          50,
+                                                                        ),
+                                                                        SizedBox(
+                                                                          width:
+                                                                          MediaQuery.of(context).size.width * 0.75,
+                                                                          height:
+                                                                          40.0,
+                                                                          child:
+                                                                          ElevatedButton.icon(
+                                                                            icon: const Icon(
+                                                                              Icons.save,
+                                                                              color: Colors.white,
+                                                                            ),
+                                                                            label: Text(
+                                                                              "Save",
+                                                                              style: GoogleFonts.aBeeZee(color: Colors.white),
+                                                                            ),
+                                                                            onPressed: () async {
+                                                                              EasyLoading.show();
+                                                                              EasyLoading.dismiss();
+
+                                                                              Navigator.of(context).pop();
+                                                                            },
+                                                                            style: ElevatedButton.styleFrom(
+                                                                              backgroundColor: Colors.green,
+                                                                              shape: RoundedRectangleBorder(
+                                                                                borderRadius: BorderRadius.circular(32.0),
+                                                                              ),
+                                                                            ),
+                                                                          ),
+                                                                        )
+                                                                      ],
+                                                                    ),
+                                                                  ));
+                                                            }));
+                                                  },
+                                                  child: Icon(
+                                                    Icons.currency_pound,
+                                                    color: Colors.blue[400],
+                                                  ),
+                                                ),
+                                                AutoSizeText(
+                                                  "Add Invoice",
+                                                  style: GoogleFonts.abel(
+                                                      fontSize: 10),
+                                                ),
+                                              ],
+                                            ))
+                                        : Container()
                                   ],
                                 ),
                               )),
@@ -1029,12 +1414,21 @@ class _BodyState extends State<Body> {
                         // );
                       }
                       for (var index = 0;
-                      index < dataSnapshot.data!.data!.appointmentsFollowUps!.length;
-                      index++) {
+                          index <
+                              dataSnapshot
+                                  .data!.data!.appointmentsFollowUps!.length;
+                          index++) {
                         print(
                             "${dataSnapshot.data!.data!.appointmentsFollowUps![index].appointmentsClientFname}");
                         children.add(Card(
-                          color: dataSnapshot.data!.data!.appointmentsFollowUps![index].followUpsAccepted == 'yes' ? Colors.white70 : Colors.white,
+                          color: dataSnapshot
+                                      .data!
+                                      .data!
+                                      .appointmentsFollowUps![index]
+                                      .followUpsAccepted ==
+                                  'yes'
+                              ? Colors.white70
+                              : Colors.white,
                           child: SizedBox(
                               height: 260.0,
                               width: 350,
@@ -1046,220 +1440,352 @@ class _BodyState extends State<Body> {
                                         flex: 4,
                                         child: Column(
                                           mainAxisAlignment:
-                                          MainAxisAlignment.start,
+                                              MainAxisAlignment.start,
                                           crossAxisAlignment:
-                                          CrossAxisAlignment.start,
+                                              CrossAxisAlignment.start,
                                           children: [
-                                            Text(
-                                                "${dataSnapshot.data!.data!.appointmentsFollowUps![index].appointmentsClientFname}",
-                                                style: GoogleFonts.aBeeZee(
-                                                    fontSize: 22,
-                                                    color: Colors.black54,
-                                                    fontWeight: FontWeight.w900)),
-                                            Text(
+                                            GestureDetector(
+                                              onTap: () {
+                                                        showCupertinoModalBottomSheet(
+                                                            context: context,
+                                                            builder: (context) =>
+                                                                StatefulBuilder(builder:
+                                                                    (BuildContext
+                                                                            context,
+                                                                        StateSetter
+                                                                            setState /*You can rename this!*/) {
+                                                                  return SizedBox(
+                                                                    height: MediaQuery.of(context)
+                                                                            .size
+                                                                            .height *
+                                                                        0.85,
+                                                                    child:
+                                                                        Padding(
+                                                                            padding: const EdgeInsets.all(15),
+                                                                            child: FutureBuilder<AllJobSheets?>(
+                                                                                future: _getAllJobSheets(
+                                                                                    commentId: dataSnapshot
+                                                                                        .data!
+                                                                                        .data!
+                                                                                        .appointmentsFollowUps![
+                                                                                    index]
+                                                                                        .followUpsCommentId,
+                                                                                    jobId: dataSnapshot
+                                                                                        .data!
+                                                                                        .data!
+                                                                                        .appointmentsFollowUps![
+                                                                                    index]
+                                                                                        .commentsJobId),
+                                                                                builder: (context, snapshot) {
+                                                                                  if(snapshot.hasData) {
+                                                                                    _videoController = VideoPlayerController.networkUrl(Uri.parse(
+                                                                                        "${snapshot.data!.data![index].videoUrl}"));
+                                                                                    return ListView.builder(
+                                                                                      itemCount:
+                                                                                      snapshot.data!.data?.length,
+                                                                                      itemBuilder: (context, index) => Padding(
+                                                                                        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 10),
+                                                                                        child: Card(
+                                                                                            child: Padding(
+                                                                                              padding: const EdgeInsets.all(15.0),
+                                                                                              child: Column(
+                                                                                                children: [
+                                                                                                  Row(
+                                                                                                    children: [
+                                                                                                      Expanded(child: AutoSizeText("Job Sheet #${snapshot.data!.data![index].id}", style: GoogleFonts.abel(fontSize: 20, fontWeight: FontWeight.w900, color: Colors.blue),)),],
+                                                                                                  ),
+                                                                                                  Row(
+                                                                                                    children: [
+                                                                                                      Expanded(child: AutoSizeText("${snapshot.data!.data![index].notes}")),
+                                                                                                    ],
+                                                                                                  ),
+                                                                                                  Row(
+                                                                                                    children: [
+                                                                                                      Expanded(child: AutoSizeText(DateFormat('dd-MMMM-yyyy hh:mm:ss').format(DateTime.parse(snapshot.data!.data![index].createdAt!)))),
+                                                                                                    ],
+                                                                                                  ),
+                                                                                                  const SizedBox(height: 20,),
+                                                                                                  Row(
+                                                                                                    children: [
+                                                                                                      Expanded(child: Image.network(
+                                                                                                          "${snapshot.data!.data![index].pictureUrl}",
+                                                                                                        // When image is loading from the server it takes some time
+                                                                                                        // So we will show progress indicator while loading
+                                                                                                        loadingBuilder: (BuildContext context, Widget child,
+                                                                                                            ImageChunkEvent? loadingProgress) {
+                                                                                                          if (loadingProgress == null) return child;
+                                                                                                          return Center(
+                                                                                                            child: CircularProgressIndicator(
+                                                                                                              value: loadingProgress.expectedTotalBytes != null
+                                                                                                                  ? loadingProgress.cumulativeBytesLoaded /
+                                                                                                                  loadingProgress.expectedTotalBytes!
+                                                                                                                  : null,
+                                                                                                            ),
+                                                                                                          );
+                                                                                                        },
+                                                                                                      )),
+                                                                                                      Expanded(child: _videoController.value.isInitialized
+                                                                                                          ? AspectRatio(
+                                                                                                        aspectRatio: _videoController.value.aspectRatio,
+                                                                                                        child: VideoPlayer(_videoController),
+                                                                                                      ): Container()),
+                                                                                                    ],
+                                                                                                  ),
+                                                                                                  const SizedBox(height: 20,),
+                                                                                                  Row(
+                                                                                                    children: [
+                                                                                                      Expanded(child: AutoSizeText("${snapshot.data!.data![index].status}")),
+                                                                                                    ],
+                                                                                                  ),
+                                                                                                ],
+                                                                                              ),
+                                                                                            )
+                                                                                        ),
+                                                                                      ),
+                                                                                    );
+                                                                                  } else {
+                                                                                    return const AutoSizeText("No data");
+                                                                                  }
+                                                                                })),
+                                                                  );
+                                                                }));
+                                              },
+                                              child: AutoSizeText(
+                                                  "${dataSnapshot.data!.data!.appointmentsFollowUps![index].appointmentsClientFname} ${dataSnapshot.data!.data!.appointmentsFollowUps![index].appointmentsClientLname}",
+                                                  style: GoogleFonts.aBeeZee(
+                                                      fontSize: 22,
+                                                      color: Colors.black54,
+                                                      fontWeight:
+                                                          FontWeight.w900)),
+                                            ),
+                                            AutoSizeText(
                                                 "${dataSnapshot.data!.data!.appointmentsFollowUps![index].appointmentsAddress1}",
                                                 style: GoogleFonts.aBeeZee(
                                                     color: Colors.black54)),
-                                            Text(
+                                            AutoSizeText(
                                                 "${dataSnapshot.data!.data!.appointmentsFollowUps![index].appointmentsAddress2}",
                                                 style: GoogleFonts.aBeeZee(
                                                     color: Colors.black54)),
-                                            Text(
+                                            AutoSizeText(
                                                 "${dataSnapshot.data!.data!.appointmentsFollowUps![index].appointmentsCity}",
                                                 style: GoogleFonts.aBeeZee(
                                                     color: Colors.black54)),
-                                            Text(
+                                            AutoSizeText(
                                                 "${dataSnapshot.data!.data!.appointmentsFollowUps![index].appointmentsState}",
                                                 style: GoogleFonts.aBeeZee(
                                                     color: Colors.black54)),
-                                            Text(
+                                            AutoSizeText(
                                                 "${dataSnapshot.data!.data!.appointmentsFollowUps![index].appointmentsPinCode}",
                                                 style: GoogleFonts.aBeeZee(
                                                     color: Colors.black54)),
                                             const SizedBox(
                                               height: 10,
                                             ),
-                                            Text(
+                                            AutoSizeText(
                                                 "${dataSnapshot.data!.data!.appointmentsFollowUps![index].commentsComment}",
                                                 style: GoogleFonts.aBeeZee(
                                                     color: Colors.black54)),
                                             const SizedBox(
                                               height: 20,
                                             ),
-                                            Text(
+                                            AutoSizeText(
                                                 "${dataSnapshot.data!.data!.appointmentsFollowUps![index].appointmentsCreatedAt}",
                                                 style: GoogleFonts.changa(
                                                     fontSize: 12,
                                                     color: Colors.black54)),
-                                            Text(
+                                            AutoSizeText(
                                                 "${dataSnapshot.data!.data!.appointmentsFollowUps![index].appointmentsMobile}",
                                                 style: GoogleFonts.changa(
                                                     fontSize: 12,
                                                     color: Colors.black54)),
-                                            Text(
+                                            AutoSizeText(
                                                 "${dataSnapshot.data!.data!.appointmentsFollowUps![index].appointmentsEmail}",
                                                 style: GoogleFonts.changa(
                                                     fontSize: 12,
                                                     color: Colors.black54)),
                                           ],
                                         )),
-                                    dataSnapshot.data!.data!.appointmentsFollowUps![index].followUpsStatus == 'inprogress' ? Expanded(
-                                        flex: 1,
-                                        child: Column(
-                                          children: [
-                                            GestureDetector(
-                                                onTap: () {
-                                                  EasyLoading.show();
-                                                  getLatAndLongitude(
-                                                      "${dataSnapshot.data!.data!.appointmentsFollowUps![index].appointmentsAddress1}, ${dataSnapshot.data!.data!.appointmentsFollowUps![index].appointmentsAddress2}, ${dataSnapshot.data!.data!.appointmentsFollowUps![index].appointmentsCity}, ${dataSnapshot.data!.data!.appointmentsFollowUps![index].appointmentsState}, ${dataSnapshot.data!.data!.appointmentsFollowUps![index].appointmentsPinCode}")
-                                                      .then((value) =>
-                                                      _launchMapsUrl(
-                                                          value[0].latitude,
-                                                          value[0]
-                                                              .longitude));
-                                                },
-                                                child: Icon(
-                                                  Icons.location_pin,
-                                                  color: Colors.blue[400],
-                                                )),
-                                            AutoSizeText(
-                                              "Open Maps",
-                                              style:
-                                              GoogleFonts.abel(fontSize: 10),
-                                            ),
-                                            dataSnapshot
-                                                .data!
-                                                .data!
-                                                .followUps![index]
-                                                .accepted ==
-                                                'no'
-                                                ? GestureDetector(
-                                              onTap: () {
-                                                EasyLoading.showInfo(
-                                                    "Accepting task");
-                                                acceptTask(followup_id: dataSnapshot.data!.data!.appointmentsFollowUps![index].id);
-                                              },
-                                              child: Icon(
-                                                Icons.check_box_outlined,
-                                                color: Colors.blue[400],
-                                              ),
-                                            )
-                                                : Container(),
-                                            dataSnapshot
+                                    dataSnapshot
                                                 .data!
                                                 .data!
                                                 .appointmentsFollowUps![index]
-                                                .followUpsAccepted ==
-                                                'no'
-                                                ? AutoSizeText(
-                                              "Accept",
-                                              style: GoogleFonts.abel(
-                                                  fontSize: 10),
-                                            )
-                                                : Container(),
-                                            dataSnapshot
-                                                .data!
-                                                .data!
-                                                .appointmentsFollowUps![index]
-                                                .followUpsAccepted ==
-                                                'yes'
-                                                ? GestureDetector(
-                                              onTap: () {
-                                                rejectTask(followup_id : 1);
-                                                EasyLoading.showInfo(
-                                                    "Rejecting task");
-                                              },
-                                              child: Icon(
-                                                Icons.crop_square_sharp,
-                                                color: Colors.blue[400],
-                                              ),
-                                            )
-                                                : Container(),
-                                            dataSnapshot
-                                                .data!
-                                                .data!
-                                                .appointmentsFollowUps![index]
-                                                .followUpsAccepted ==
-                                                'yes'
-                                                ? AutoSizeText(
-                                              "Reject",
-                                              style: GoogleFonts.abel(
-                                                  fontSize: 10),
-                                            )
-                                                : Container(),
-                                            GestureDetector(
-                                              onTap: () {
-                                                _selectDate(context)
-                                                    .then((value) {
-                                                  rescheduleAppointment(
-                                                      value,
-                                                      dataSnapshot
-                                                          .data!
-                                                          .data!
-                                                          .appointmentsFollowUps![index]
-                                                          .commentsSalesId);
-                                                  return value;
-                                                });
-                                              },
-                                              child: Icon(
-                                                Icons.calendar_month_sharp,
-                                                color: Colors.blue[400],
-                                              ),
-                                            ),
-                                            AutoSizeText(
-                                              "Reschedule",
-                                              style:
-                                              GoogleFonts.abel(fontSize: 10),
-                                            ),
-                                            GestureDetector(
-                                              onTap: () {
-                                                EasyLoading.show();
-                                                _makePhoneCall(
-                                                    'tel:${dataSnapshot.data!.data!.appointmentsFollowUps![index].appointmentsMobile}');
-                                              },
-                                              child: Icon(
-                                                Icons.phone,
-                                                color: Colors.blue[400],
-                                              ),
-                                            ),
-                                            AutoSizeText(
-                                              "Call",
-                                              style:
-                                              GoogleFonts.abel(fontSize: 10),
-                                            ),
-                                            GestureDetector(
-                                              onTap: () {
-                                                showCupertinoModalBottomSheet(
-                                                  context: context,
-                                                  builder: (context) =>
-                                                      StatefulBuilder(builder:
-                                                          (BuildContext context,
-                                                          StateSetter
-                                                          setState /*You can rename this!*/) {
+                                                .followUpsStatus ==
+                                            'inprogress'
+                                        ? Expanded(
+                                            flex: 1,
+                                            child: Column(
+                                              children: [
+                                                GestureDetector(
+                                                    onTap: () {
+                                                      EasyLoading.show();
+                                                      getLatAndLongitude(
+                                                              "${dataSnapshot.data!.data!.appointmentsFollowUps![index].appointmentsAddress1}, ${dataSnapshot.data!.data!.appointmentsFollowUps![index].appointmentsAddress2}, ${dataSnapshot.data!.data!.appointmentsFollowUps![index].appointmentsCity}, ${dataSnapshot.data!.data!.appointmentsFollowUps![index].appointmentsState}, ${dataSnapshot.data!.data!.appointmentsFollowUps![index].appointmentsPinCode}")
+                                                          .then((value) =>
+                                                              _launchMapsUrl(
+                                                                  value[0]
+                                                                      .latitude,
+                                                                  value[0]
+                                                                      .longitude));
+                                                    },
+                                                    child: Icon(
+                                                      Icons.location_pin,
+                                                      color: Colors.blue[400],
+                                                    )),
+                                                AutoSizeText(
+                                                  "Open Maps",
+                                                  style: GoogleFonts.abel(
+                                                      fontSize: 10),
+                                                ),
+                                                dataSnapshot
+                                                            .data!
+                                                            .data!
+                                                            .followUps![index]
+                                                            .accepted ==
+                                                        'no'
+                                                    ? GestureDetector(
+                                                        onTap: () {
+                                                          EasyLoading.showInfo(
+                                                              "Accepting task");
+                                                          acceptTask(
+                                                              followup_id:
+                                                                  dataSnapshot
+                                                                      .data!
+                                                                      .data!
+                                                                      .appointmentsFollowUps![
+                                                                          index]
+                                                                      .id);
+                                                        },
+                                                        child: Icon(
+                                                          Icons
+                                                              .check_box_outlined,
+                                                          color:
+                                                              Colors.blue[400],
+                                                        ),
+                                                      )
+                                                    : Container(),
+                                                dataSnapshot
+                                                            .data!
+                                                            .data!
+                                                            .appointmentsFollowUps![
+                                                                index]
+                                                            .followUpsAccepted ==
+                                                        'no'
+                                                    ? AutoSizeText(
+                                                        "Accept",
+                                                        style: GoogleFonts.abel(
+                                                            fontSize: 10),
+                                                      )
+                                                    : Container(),
+                                                dataSnapshot
+                                                            .data!
+                                                            .data!
+                                                            .appointmentsFollowUps![
+                                                                index]
+                                                            .followUpsAccepted ==
+                                                        'yes'
+                                                    ? GestureDetector(
+                                                        onTap: () {
+                                                          rejectTask(
+                                                              followup_id: 1);
+                                                          EasyLoading.showInfo(
+                                                              "Rejecting task");
+                                                        },
+                                                        child: Icon(
+                                                          Icons
+                                                              .crop_square_sharp,
+                                                          color:
+                                                              Colors.blue[400],
+                                                        ),
+                                                      )
+                                                    : Container(),
+                                                dataSnapshot
+                                                            .data!
+                                                            .data!
+                                                            .appointmentsFollowUps![
+                                                                index]
+                                                            .followUpsAccepted ==
+                                                        'yes'
+                                                    ? AutoSizeText(
+                                                        "Reject",
+                                                        style: GoogleFonts.abel(
+                                                            fontSize: 10),
+                                                      )
+                                                    : Container(),
+                                                GestureDetector(
+                                                  onTap: () {
+                                                    _selectDate(context)
+                                                        .then((value) {
+                                                      rescheduleAppointment(
+                                                          value,
+                                                          dataSnapshot
+                                                              .data!
+                                                              .data!
+                                                              .appointmentsFollowUps![
+                                                                  index]
+                                                              .commentsSalesId);
+                                                      return value;
+                                                    });
+                                                  },
+                                                  child: Icon(
+                                                    Icons.calendar_month_sharp,
+                                                    color: Colors.blue[400],
+                                                  ),
+                                                ),
+                                                AutoSizeText(
+                                                  "Reschedule",
+                                                  style: GoogleFonts.abel(
+                                                      fontSize: 10),
+                                                ),
+                                                GestureDetector(
+                                                  onTap: () {
+                                                    EasyLoading.show();
+                                                    _makePhoneCall(
+                                                        'tel:${dataSnapshot.data!.data!.appointmentsFollowUps![index].appointmentsMobile}');
+                                                  },
+                                                  child: Icon(
+                                                    Icons.phone,
+                                                    color: Colors.blue[400],
+                                                  ),
+                                                ),
+                                                AutoSizeText(
+                                                  "Call",
+                                                  style: GoogleFonts.abel(
+                                                      fontSize: 10),
+                                                ),
+                                                GestureDetector(
+                                                  onTap: () {
+                                                    showCupertinoModalBottomSheet(
+                                                      context: context,
+                                                      builder: (context) =>
+                                                          StatefulBuilder(builder:
+                                                              (BuildContext
+                                                                      context,
+                                                                  StateSetter
+                                                                      setState /*You can rename this!*/) {
                                                         return Container(
-                                                          height:
-                                                          MediaQuery.of(context)
-                                                              .size
-                                                              .height *
+                                                          height: MediaQuery.of(
+                                                                      context)
+                                                                  .size
+                                                                  .height *
                                                               0.85,
                                                           child: Padding(
                                                             padding:
-                                                            const EdgeInsets.all(
-                                                                15.0),
+                                                                const EdgeInsets
+                                                                    .all(15.0),
                                                             child:
-                                                            SingleChildScrollView(
+                                                                SingleChildScrollView(
                                                               child: Column(
                                                                 crossAxisAlignment:
-                                                                CrossAxisAlignment
-                                                                    .center,
+                                                                    CrossAxisAlignment
+                                                                        .center,
                                                                 children: [
                                                                   AutoSizeText(
                                                                     "Add a job sheet",
                                                                     style: GoogleFonts.abel(
-                                                                        fontSize: 25,
+                                                                        fontSize:
+                                                                            25,
                                                                         fontWeight:
-                                                                        FontWeight
-                                                                            .w900),
+                                                                            FontWeight.w900),
                                                                   ),
                                                                   const SizedBox(
                                                                     height: 20,
@@ -1267,203 +1793,188 @@ class _BodyState extends State<Body> {
                                                                   AutoSizeText(
                                                                     "${dataSnapshot.data!.data!.appointmentsFollowUps![index].commentsComment}",
                                                                     style: GoogleFonts.abel(
-                                                                        fontSize: 15,
+                                                                        fontSize:
+                                                                            15,
                                                                         fontWeight:
-                                                                        FontWeight
-                                                                            .w400),
+                                                                            FontWeight.w400),
                                                                   ),
                                                                   const SizedBox(
                                                                     height: 20,
                                                                   ),
                                                                   TextFormField(
                                                                     controller:
-                                                                    _notesController,
-                                                                    maxLines: 10,
-                                                                    decoration:
-                                                                    const InputDecoration(
-                                                                      border: OutlineInputBorder(
-                                                                          borderSide:
-                                                                          BorderSide(
-                                                                              color:
-                                                                              Colors.teal)),
-                                                                      // hintText: 'Tell us about yourself',
-                                                                      helperText:
-                                                                      'Mention all the efforts made for the task',
-                                                                      labelText:
-                                                                      'Notes',
-                                                                    ),
+                                                                        _notesController,
+                                                                    maxLines:
+                                                                        10,
+                                                                    decoration: const InputDecoration(
+                                                                        border: OutlineInputBorder(borderSide: BorderSide(color: Colors.teal)),
+                                                                        // hintText: 'Tell us about yourself',
+                                                                        helperText: 'Mention all the efforts made for the task',
+                                                                        labelText: 'Notes',
+                                                                        floatingLabelBehavior: FloatingLabelBehavior.always),
                                                                   ),
                                                                   const SizedBox(
                                                                     height: 20,
                                                                   ),
                                                                   DropdownButton<
                                                                       String>(
-                                                                    hint:
-                                                                    const AutoSizeText(
+                                                                    hint: const AutoSizeText(
                                                                         "Status"),
                                                                     value:
-                                                                    dropdownValue,
-                                                                    isExpanded: true,
-                                                                    icon: const Icon(Icons
-                                                                        .arrow_downward),
-                                                                    elevation: 16,
+                                                                        dropdownValue,
+                                                                    isExpanded:
+                                                                        true,
+                                                                    icon: const Icon(
+                                                                        Icons
+                                                                            .arrow_downward),
+                                                                    elevation:
+                                                                        16,
                                                                     style: const TextStyle(
                                                                         color: Colors
                                                                             .teal),
                                                                     underline:
-                                                                    Container(
+                                                                        Container(
                                                                       height: 2,
-                                                                      color:
-                                                                      Colors.teal,
+                                                                      color: Colors
+                                                                          .teal,
                                                                     ),
                                                                     onChanged:
                                                                         (String?
-                                                                    value) {
+                                                                            value) {
                                                                       // This is called when the user selects an item.
-                                                                      setState(() {
+                                                                      setState(
+                                                                          () {
                                                                         dropdownValue =
-                                                                        value!;
+                                                                            value!;
                                                                       });
                                                                     },
                                                                     items: list.map<
                                                                         DropdownMenuItem<
                                                                             String>>((String
-                                                                    value) {
+                                                                        value) {
                                                                       return DropdownMenuItem<
                                                                           String>(
-                                                                        value: value,
+                                                                        value:
+                                                                            value,
                                                                         child: Text(
                                                                             value),
                                                                       );
                                                                     }).toList(),
                                                                   ),
                                                                   _photoCaptured ==
-                                                                      false
+                                                                          false
                                                                       ? IconButton(
-                                                                    iconSize:
-                                                                    100,
-                                                                    icon:
-                                                                    const Icon(
-                                                                      Icons
-                                                                          .image,
-                                                                      size: 45,
-                                                                    ),
-                                                                    // the method which is called
-                                                                    // when button is pressed
-                                                                    onPressed:
-                                                                        () async {
-                                                                      print(
-                                                                          "camera pressed");
-                                                                      // Pick an image.
-                                                                      // final XFile? image =
-                                                                      //     await picker.pickImage(
-                                                                      //         source: ImageSource
-                                                                      //             .gallery);
-                                                                      // Capture a photo.
-                                                                      photo = await picker
-                                                                          .pickImage(
-                                                                          source: ImageSource.camera)
-                                                                          .then((value) {
-                                                                        setState(
-                                                                                () {
-                                                                              _photoCaptured =
-                                                                              true;
+                                                                          iconSize:
+                                                                              100,
+                                                                          icon:
+                                                                              const Icon(
+                                                                            Icons.image,
+                                                                            size:
+                                                                                45,
+                                                                          ),
+                                                                          // the method which is called
+                                                                          // when button is pressed
+                                                                          onPressed:
+                                                                              () async {
+                                                                            print("camera pressed");
+                                                                            // Pick an image.
+                                                                            // final XFile? image =
+                                                                            //     await picker.pickImage(
+                                                                            //         source: ImageSource
+                                                                            //             .gallery);
+                                                                            // Capture a photo.
+                                                                            photo =
+                                                                                await picker.pickImage(source: ImageSource.camera).then((value) {
+                                                                              setState(() {
+                                                                                _photoCaptured = true;
+                                                                              });
+                                                                              return value;
                                                                             });
-                                                                        return value;
-                                                                      });
-                                                                    },
-                                                                  )
+                                                                          },
+                                                                        )
                                                                       : Container(),
                                                                   _photoCaptured ==
-                                                                      false
+                                                                          false
                                                                       ? AutoSizeText(
-                                                                    "Add image",
-                                                                    style: GoogleFonts.abel(
-                                                                        fontSize:
-                                                                        15,
-                                                                        fontWeight:
-                                                                        FontWeight.w500),
-                                                                  )
+                                                                          "Add image",
+                                                                          style: GoogleFonts.abel(
+                                                                              fontSize: 15,
+                                                                              fontWeight: FontWeight.w500),
+                                                                        )
                                                                       : Container(),
                                                                   const SizedBox(
                                                                     height: 10,
                                                                   ),
                                                                   _photoCaptured
                                                                       ? Stack(
-                                                                    children: [
-                                                                      ClipRRect(
-                                                                        borderRadius:
-                                                                        const BorderRadius.all(Radius.circular(25)),
-                                                                        child: Image.file(
-                                                                            File(photo!.path)),
-                                                                      ),
-                                                                    ],
-                                                                  )
+                                                                          children: [
+                                                                            ClipRRect(
+                                                                              borderRadius: const BorderRadius.all(Radius.circular(25)),
+                                                                              child: Image.file(File(photo!.path)),
+                                                                            ),
+                                                                          ],
+                                                                        )
                                                                       : Container(),
                                                                   const SizedBox(
                                                                     height: 10,
                                                                   ),
-                                                                  !_videoCaptured ? IconButton(
-                                                                    iconSize: 100,
-                                                                    icon: const Icon(
-                                                                      Icons
-                                                                          .video_camera_back_outlined,
-                                                                      size: 45,
-                                                                    ),
-                                                                    // the method which is called
-                                                                    // when button is pressed
-                                                                    onPressed: () {
-                                                                      setState(
-                                                                            () async {
-                                                                          // Capture a video.
-                                                                          cameraVideo = await picker
-                                                                              .pickVideo(
-                                                                              source: ImageSource
-                                                                                  .camera)
-                                                                              .then(
-                                                                                  (value) {
-                                                                                setState(
-                                                                                        () {
-                                                                                      _controller = VideoPlayerController.file(File(value!
-                                                                                          .path))
-                                                                                        ..initialize()
-                                                                                            .then((_) {
-                                                                                          // Ensure the first frame is shown after the video is initialized, even before the play button has been pressed.
-                                                                                          setState(() {
-                                                                                            _videoCaptured = true;
-                                                                                            _controller.play();
-                                                                                          });
+                                                                  !_videoCaptured
+                                                                      ? IconButton(
+                                                                          iconSize:
+                                                                              100,
+                                                                          icon:
+                                                                              const Icon(
+                                                                            Icons.video_camera_back_outlined,
+                                                                            size:
+                                                                                45,
+                                                                          ),
+                                                                          // the method which is called
+                                                                          // when button is pressed
+                                                                          onPressed:
+                                                                              () {
+                                                                            setState(
+                                                                              () async {
+                                                                                // Capture a video.
+                                                                                cameraVideo = await picker.pickVideo(source: ImageSource.camera).then((value) {
+                                                                                  setState(() {
+                                                                                    _controller = VideoPlayerController.file(File(value!.path))
+                                                                                      ..initialize().then((_) {
+                                                                                        // Ensure the first frame is shown after the video is initialized, even before the play button has been pressed.
+                                                                                        setState(() {
+                                                                                          _videoCaptured = true;
+                                                                                          _controller.play();
                                                                                         });
-                                                                                    });
-                                                                                return value;
-                                                                              });
-                                                                        },
-                                                                      );
-                                                                    },
-                                                                  ) : Container(),
-                                                                  !_videoCaptured ? AutoSizeText(
-                                                                    "Add video",
-                                                                    style: GoogleFonts.abel(
-                                                                        fontSize: 15,
-                                                                        fontWeight:
-                                                                        FontWeight
-                                                                            .w500),
-                                                                  ) : Container(),
+                                                                                      });
+                                                                                  });
+                                                                                  return value;
+                                                                                });
+                                                                              },
+                                                                            );
+                                                                          },
+                                                                        )
+                                                                      : Container(),
+                                                                  !_videoCaptured
+                                                                      ? AutoSizeText(
+                                                                          "Add video",
+                                                                          style: GoogleFonts.abel(
+                                                                              fontSize: 15,
+                                                                              fontWeight: FontWeight.w500),
+                                                                        )
+                                                                      : Container(),
                                                                   const SizedBox(
                                                                     height: 10,
                                                                   ),
                                                                   _videoCaptured &&
-                                                                      _controller
-                                                                          .value
-                                                                          .isInitialized
+                                                                          _controller
+                                                                              .value
+                                                                              .isInitialized
                                                                       ? AspectRatio(
-                                                                    aspectRatio:
-                                                                    _controller
-                                                                        .value
-                                                                        .aspectRatio,
-                                                                    child: VideoPlayer(
-                                                                        _controller),
-                                                                  )
+                                                                          aspectRatio: _controller
+                                                                              .value
+                                                                              .aspectRatio,
+                                                                          child:
+                                                                              VideoPlayer(_controller),
+                                                                        )
                                                                       : Container(),
                                                                   const SizedBox(
                                                                     height: 10,
@@ -1472,69 +1983,76 @@ class _BodyState extends State<Body> {
                                                                     height: 30,
                                                                   ),
                                                                   SizedBox(
-                                                                    width: MediaQuery.of(
-                                                                        context)
-                                                                        .size
-                                                                        .width *
+                                                                    width: MediaQuery.of(context)
+                                                                            .size
+                                                                            .width *
                                                                         0.75,
-                                                                    height: 40.0,
+                                                                    height:
+                                                                        40.0,
                                                                     child:
-                                                                    ElevatedButton
-                                                                        .icon(
+                                                                        ElevatedButton
+                                                                            .icon(
                                                                       icon:
-                                                                      const Icon(
-                                                                        Icons.save,
+                                                                          const Icon(
+                                                                        Icons
+                                                                            .save,
                                                                         color: Colors
                                                                             .white,
                                                                       ),
-                                                                      label: Text(
+                                                                      label:
+                                                                          Text(
                                                                         "Save",
-                                                                        style: GoogleFonts
-                                                                            .aBeeZee(
+                                                                        style: GoogleFonts.aBeeZee(
                                                                             color:
-                                                                            Colors.white),
+                                                                                Colors.white),
                                                                       ),
-                                                                      onPressed: () async {
+                                                                      onPressed:
+                                                                          () async {
                                                                         EasyLoading
                                                                             .show();
                                                                         print(photo
                                                                             ?.path);
                                                                         print(cameraVideo
                                                                             ?.path);
-                                                                        print(
-                                                                            _notesController
-                                                                                .text);
+                                                                        print(_notesController
+                                                                            .text);
                                                                         print(
                                                                             dropdownValue);
-                                                                        final SharedPreferences prefs = await SharedPreferences.getInstance();
-                                                                        var user = json.decode(prefs.getString('user')!) as Map;
-                                                                        print("user");
-                                                                        print(user);
+                                                                        final SharedPreferences
+                                                                            prefs =
+                                                                            await SharedPreferences.getInstance();
+                                                                        var user =
+                                                                            json.decode(prefs.getString('user')!)
+                                                                                as Map;
+                                                                        print(
+                                                                            "user");
+                                                                        print(
+                                                                            user);
                                                                         _saveJobSheet(
-                                                                            job_id: dataSnapshot.data!.data!.appointmentsFollowUps![index].commentsJobId,
+                                                                            job_id:
+                                                                                dataSnapshot.data!.data!.appointmentsFollowUps![index].commentsJobId,
                                                                             comment_id: dataSnapshot.data!.data!.appointmentsFollowUps![index].followUpsCommentId,
                                                                             comment_notes: _notesController.text,
                                                                             status: dropdownValue.toLowerCase(),
                                                                             user_id: user['id'],
                                                                             photo: photo,
-                                                                            video: cameraVideo
-                                                                        );
+                                                                            video: cameraVideo);
                                                                         EasyLoading
                                                                             .dismiss();
 
-                                                                        Navigator.of(context).pop();
-                                                                        _notesController.text = "";
+                                                                        Navigator.of(context)
+                                                                            .pop();
+                                                                        _notesController.text =
+                                                                            "";
                                                                       },
                                                                       style: ElevatedButton
                                                                           .styleFrom(
                                                                         backgroundColor:
-                                                                        Colors
-                                                                            .green,
+                                                                            Colors.green,
                                                                         shape:
-                                                                        RoundedRectangleBorder(
+                                                                            RoundedRectangleBorder(
                                                                           borderRadius:
-                                                                          BorderRadius.circular(
-                                                                              32.0),
+                                                                              BorderRadius.circular(32.0),
                                                                         ),
                                                                       ),
                                                                     ),
@@ -1545,35 +2063,253 @@ class _BodyState extends State<Body> {
                                                           ),
                                                         );
                                                       }),
-                                                );
-                                              },
-                                              child: Icon(
-                                                Icons.note_add_outlined,
-                                                color: Colors.blue[400],
-                                              ),
-                                            ),
-                                            AutoSizeText(
-                                              "Add Note",
-                                              style:
-                                              GoogleFonts.abel(fontSize: 10),
-                                            ),
-                                            GestureDetector(
-                                              onTap: (){
-                                                EasyLoading.showToast("Feature coming soon, meanwhile you can add it by logging in our web version",
-                                                );
-                                              },
-                                              child: Icon(
-                                                Icons.currency_pound,
-                                                color: Colors.blue[400],
-                                              ),
-                                            ),
-                                            AutoSizeText(
-                                              "Add Invoice",
-                                              style:
-                                              GoogleFonts.abel(fontSize: 10),
-                                            ),
-                                          ],
-                                        )) : Container()
+                                                    );
+                                                  },
+                                                  child: Icon(
+                                                    Icons.note_add_outlined,
+                                                    color: Colors.blue[400],
+                                                  ),
+                                                ),
+                                                AutoSizeText(
+                                                  "Add Note",
+                                                  style: GoogleFonts.abel(
+                                                      fontSize: 10),
+                                                ),
+                                                GestureDetector(
+                                                  onTap: () {
+                                                    showCupertinoModalBottomSheet(
+                                                        context: context,
+                                                        builder: (context) =>
+                                                            StatefulBuilder(builder:
+                                                                (BuildContext
+                                                                        context,
+                                                                    StateSetter
+                                                                        setState /*You can rename this!*/) {
+                                                              return SizedBox(
+                                                                  height: MediaQuery.of(
+                                                                              context)
+                                                                          .size
+                                                                          .height *
+                                                                      0.85,
+                                                                  child:
+                                                                      SingleChildScrollView(
+                                                                    child:
+                                                                        Padding(
+                                                                      padding: const EdgeInsets
+                                                                              .all(
+                                                                          15.0),
+                                                                      child:
+                                                                          Column(
+                                                                        crossAxisAlignment:
+                                                                            CrossAxisAlignment.center,
+                                                                        children: [
+                                                                          Text(
+                                                                            "Add an Invoice",
+                                                                            style:
+                                                                                GoogleFonts.abel(fontSize: 30, fontWeight: FontWeight.bold),
+                                                                          ),
+                                                                          const SizedBox(
+                                                                            height:
+                                                                                20,
+                                                                          ),
+                                                                          TextFormField(
+                                                                            controller:
+                                                                                _notesController,
+                                                                            maxLines:
+                                                                                1,
+                                                                            decoration:
+                                                                                InputDecoration(
+                                                                              border: OutlineInputBorder(
+                                                                                borderRadius: BorderRadius.circular(15.0),
+                                                                              ),
+                                                                              // hintText: 'Tell us about yourself',
+                                                                              labelText: 'Service Charge',
+                                                                              labelStyle: GoogleFonts.abel(),
+                                                                              floatingLabelBehavior: FloatingLabelBehavior.always,
+                                                                              contentPadding: const EdgeInsets.all(5.0),
+                                                                            ),
+                                                                          ),
+                                                                          const SizedBox(
+                                                                            height:
+                                                                                20,
+                                                                          ),
+                                                                          TextFormField(
+                                                                            controller:
+                                                                                _notesController,
+                                                                            maxLines:
+                                                                                1,
+                                                                            decoration:
+                                                                                InputDecoration(
+                                                                              border: OutlineInputBorder(
+                                                                                borderRadius: BorderRadius.circular(15.0),
+                                                                              ),
+                                                                              // hintText: 'Tell us about yourself',
+                                                                              labelText: 'Hours Spent',
+                                                                              labelStyle: GoogleFonts.abel(),
+                                                                              floatingLabelBehavior: FloatingLabelBehavior.always,
+                                                                              contentPadding: const EdgeInsets.all(5.0),
+                                                                            ),
+                                                                          ),
+                                                                          const SizedBox(
+                                                                            height:
+                                                                                20,
+                                                                          ),
+                                                                          TextFormField(
+                                                                            controller:
+                                                                                _notesController,
+                                                                            maxLines:
+                                                                                1,
+                                                                            decoration:
+                                                                                InputDecoration(
+                                                                              border: OutlineInputBorder(
+                                                                                borderRadius: BorderRadius.circular(15.0),
+                                                                              ),
+                                                                              // hintText: 'Tell us about yourself',
+                                                                              labelText: 'Visiting Fee',
+                                                                              labelStyle: GoogleFonts.abel(),
+                                                                              floatingLabelBehavior: FloatingLabelBehavior.always,
+                                                                              contentPadding: const EdgeInsets.all(5.0),
+                                                                            ),
+                                                                          ),
+                                                                          const SizedBox(
+                                                                            height:
+                                                                                20,
+                                                                          ),
+                                                                          TextFormField(
+                                                                            controller:
+                                                                                _notesController,
+                                                                            maxLines:
+                                                                                1,
+                                                                            decoration:
+                                                                                InputDecoration(
+                                                                              border: OutlineInputBorder(
+                                                                                borderRadius: BorderRadius.circular(15.0),
+                                                                              ),
+                                                                              // hintText: 'Tell us about yourself',
+                                                                              labelText: 'Discount Percentage',
+                                                                              labelStyle: GoogleFonts.abel(),
+                                                                              floatingLabelBehavior: FloatingLabelBehavior.always,
+                                                                              contentPadding: const EdgeInsets.all(5.0),
+                                                                            ),
+                                                                          ),
+                                                                          CheckboxListTile(
+                                                                            title:
+                                                                                Text(
+                                                                              "GST Applicable",
+                                                                              style: GoogleFonts.abel(),
+                                                                            ),
+                                                                            subtitle:
+                                                                                Text(
+                                                                              "10%",
+                                                                              style: GoogleFonts.sourceCodePro(color: Colors.green),
+                                                                            ),
+                                                                            value:
+                                                                                false,
+                                                                            onChanged:
+                                                                                (newValue) {
+                                                                              setState(() {
+                                                                                // checkedValue = newValue;
+                                                                              });
+                                                                            },
+                                                                            controlAffinity:
+                                                                                ListTileControlAffinity.leading, //  <-- leading Checkbox
+                                                                          ),
+                                                                          CheckboxListTile(
+                                                                            title:
+                                                                                Text(
+                                                                              "Card Processing Applicable",
+                                                                              style: GoogleFonts.abel(),
+                                                                            ),
+                                                                            subtitle:
+                                                                                Text(
+                                                                              "2.5% fee",
+                                                                              style: GoogleFonts.sourceCodePro(color: Colors.green),
+                                                                            ),
+                                                                            value:
+                                                                                false,
+                                                                            onChanged:
+                                                                                (newValue) {
+                                                                              setState(() {
+                                                                                // checkedValue = newValue;
+                                                                              });
+                                                                            },
+                                                                            controlAffinity:
+                                                                                ListTileControlAffinity.leading, //  <-- leading Checkbox
+                                                                          ),
+                                                                          const SizedBox(
+                                                                            height:
+                                                                                20,
+                                                                          ),
+                                                                          TextFormField(
+                                                                            readOnly:
+                                                                                true,
+                                                                            controller:
+                                                                                _notesController,
+                                                                            maxLines:
+                                                                                1,
+                                                                            decoration:
+                                                                                InputDecoration(
+                                                                              border: OutlineInputBorder(
+                                                                                borderRadius: BorderRadius.circular(15.0),
+                                                                              ),
+                                                                              // hintText: 'Tell us about yourself',
+                                                                              labelText: 'Total Amount',
+                                                                              floatingLabelBehavior: FloatingLabelBehavior.always,
+                                                                              contentPadding: const EdgeInsets.all(5.0),
+                                                                            ),
+                                                                          ),
+                                                                          const SizedBox(
+                                                                            height:
+                                                                                50,
+                                                                          ),
+                                                                          SizedBox(
+                                                                            width:
+                                                                                MediaQuery.of(context).size.width * 0.75,
+                                                                            height:
+                                                                                40.0,
+                                                                            child:
+                                                                                ElevatedButton.icon(
+                                                                              icon: const Icon(
+                                                                                Icons.save,
+                                                                                color: Colors.white,
+                                                                              ),
+                                                                              label: Text(
+                                                                                "Save",
+                                                                                style: GoogleFonts.aBeeZee(color: Colors.white),
+                                                                              ),
+                                                                              onPressed: () async {
+                                                                                EasyLoading.show();
+                                                                                EasyLoading.dismiss();
+
+                                                                                Navigator.of(context).pop();
+                                                                              },
+                                                                              style: ElevatedButton.styleFrom(
+                                                                                backgroundColor: Colors.green,
+                                                                                shape: RoundedRectangleBorder(
+                                                                                  borderRadius: BorderRadius.circular(32.0),
+                                                                                ),
+                                                                              ),
+                                                                            ),
+                                                                          )
+                                                                        ],
+                                                                      ),
+                                                                    ),
+                                                                  ));
+                                                            }));
+                                                  },
+                                                  child: Icon(
+                                                    Icons.currency_pound,
+                                                    color: Colors.blue[400],
+                                                  ),
+                                                ),
+                                                AutoSizeText(
+                                                  "Add Invoice",
+                                                  style: GoogleFonts.abel(
+                                                      fontSize: 10),
+                                                ),
+                                              ],
+                                            ))
+                                        : Container()
                                   ],
                                 ),
                               )),
