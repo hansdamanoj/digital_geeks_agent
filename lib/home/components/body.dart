@@ -38,11 +38,18 @@ class _BodyState extends State<Body> {
   XFile? cameraVideo;
   bool _photoCaptured = false;
   bool _videoCaptured = false;
+  bool _hasTax = false;
+  bool _hasCardProcessing = false;
   late VideoPlayerController _controller;
   final TextEditingController _notesController = TextEditingController();
+  final TextEditingController _serviceChargeController = TextEditingController();
+  final TextEditingController _hoursSpentController = TextEditingController();
+  final TextEditingController _visitingFeeController = TextEditingController();
+  final TextEditingController _discountController = TextEditingController();
   final GlobalKey<LiquidPullToRefreshState> _refreshIndicatorKey =
       GlobalKey<LiquidPullToRefreshState>();
   late VideoPlayerController _videoController;
+
 
   Future<MyTasks?> _getAgentTasks() async {
     // EasyLoading.show();
@@ -305,6 +312,10 @@ class _BodyState extends State<Body> {
   void dispose() {
     _controller.dispose();
     _notesController.dispose();
+    _serviceChargeController.dispose();
+    _hoursSpentController.dispose();
+    _visitingFeeController.dispose();
+    _discountController.dispose();
     super.dispose();
   }
 
@@ -1163,7 +1174,7 @@ class _BodyState extends State<Body> {
                                                                         ),
                                                                         TextFormField(
                                                                           controller:
-                                                                          _notesController,
+                                                                          _serviceChargeController,
                                                                           maxLines:
                                                                           1,
                                                                           decoration:
@@ -1184,7 +1195,7 @@ class _BodyState extends State<Body> {
                                                                         ),
                                                                         TextFormField(
                                                                           controller:
-                                                                          _notesController,
+                                                                          _hoursSpentController,
                                                                           maxLines:
                                                                           1,
                                                                           decoration:
@@ -1205,7 +1216,7 @@ class _BodyState extends State<Body> {
                                                                         ),
                                                                         TextFormField(
                                                                           controller:
-                                                                          _notesController,
+                                                                          _visitingFeeController,
                                                                           maxLines:
                                                                           1,
                                                                           decoration:
@@ -1226,7 +1237,7 @@ class _BodyState extends State<Body> {
                                                                         ),
                                                                         TextFormField(
                                                                           controller:
-                                                                          _notesController,
+                                                                          _discountController,
                                                                           maxLines:
                                                                           1,
                                                                           decoration:
@@ -1253,11 +1264,15 @@ class _BodyState extends State<Body> {
                                                                             style: GoogleFonts.sourceCodePro(color: Colors.green),
                                                                           ),
                                                                           value:
-                                                                          false,
+                                                                          _hasTax ? true : false,
                                                                           onChanged:
                                                                               (newValue) {
                                                                             setState(() {
-                                                                              // checkedValue = newValue;
+                                                                              if(_hasTax == true){
+                                                                                _hasTax = false;
+                                                                              }else{
+                                                                                _hasTax = true;
+                                                                              }
                                                                             });
                                                                           },
                                                                           controlAffinity:
@@ -1275,11 +1290,15 @@ class _BodyState extends State<Body> {
                                                                             style: GoogleFonts.sourceCodePro(color: Colors.green),
                                                                           ),
                                                                           value:
-                                                                          false,
+                                                                          _hasCardProcessing ? true : false,
                                                                           onChanged:
                                                                               (newValue) {
                                                                             setState(() {
-                                                                              // checkedValue = newValue;
+                                                                              if(_hasCardProcessing == true){
+                                                                                _hasCardProcessing = false;
+                                                                              }else{
+                                                                                _hasCardProcessing = true;
+                                                                              }
                                                                             });
                                                                           },
                                                                           controlAffinity:
