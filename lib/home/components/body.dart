@@ -16,6 +16,7 @@ import 'package:shimmer/shimmer.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:video_player/video_player.dart';
 import 'package:intl/intl.dart';
+import 'package:basic_utils/basic_utils.dart';
 
 const List<String> list = <String>['Resolved', 'Pending', 'Closed'];
 
@@ -30,7 +31,7 @@ class _BodyState extends State<Body> {
   bool _apiHasData = false;
   var _apiHasDataCount = 0;
   final Dio dio = Dio();
-  late final Future allTasks;
+  late Future allTasks;
   DateTime selectedDate = DateTime.now();
   final ImagePicker picker = ImagePicker();
   String dropdownValue = list.first;
@@ -42,14 +43,14 @@ class _BodyState extends State<Body> {
   bool _hasCardProcessing = false;
   late VideoPlayerController _controller;
   final TextEditingController _notesController = TextEditingController();
-  final TextEditingController _serviceChargeController = TextEditingController();
+  final TextEditingController _serviceChargeController =
+      TextEditingController();
   final TextEditingController _hoursSpentController = TextEditingController();
   final TextEditingController _visitingFeeController = TextEditingController();
   final TextEditingController _discountController = TextEditingController();
   final GlobalKey<LiquidPullToRefreshState> _refreshIndicatorKey =
       GlobalKey<LiquidPullToRefreshState>();
   late VideoPlayerController _videoController;
-
 
   Future<MyTasks?> _getAgentTasks() async {
     // EasyLoading.show();
@@ -75,7 +76,7 @@ class _BodyState extends State<Body> {
       if (response.statusCode == 200) {
         var responseData = json.decode(json.encode(response.data)) as Map;
         print(responseData['data']['followUps'].length);
-        _apiHasDataCount = responseData['data']['followUps'].length;
+        _apiHasDataCount = responseData['data']['followUps'].length + responseData['data']['appointmentsFollowUps'].length;
         EasyLoading.dismiss();
         setState(() {
           _apiHasData = true;
@@ -166,27 +167,56 @@ class _BodyState extends State<Body> {
     }
   }
 
-  Future<DateTime?> _selectDate(BuildContext context) async {
+  DateTime selectedDateTime = DateTime.now();
+  Future<DateTime?> _selectDate(BuildContext context, salesId) async {
     final DateTime? picked = await showDatePicker(
-        context: context,
-        initialDate: selectedDate,
-        firstDate: DateTime(2015, 8),
-        lastDate: DateTime(2101));
+            context: context,
+            initialDate: selectedDate,
+            firstDate: DateTime(2015, 8),
+            lastDate: DateTime(2101))
+        .then((selectedDate) {
+      // After selecting the date, display the time picker.
+      if (selectedDate != null) {
+        showTimePicker(
+          context: context,
+          initialTime: TimeOfDay.now(),
+        ).then((selectedTime) {
+          // Handle the selected date and time here.
+          if (selectedTime != null) {
+            selectedDateTime = DateTime(
+              selectedDate.year,
+              selectedDate.month,
+              selectedDate.day,
+              selectedTime.hour,
+              selectedTime.minute,
+            );
+            print(selectedDateTime);
+
+            rescheduleAppointment(selectedDateTime, salesId);
+            return selectedDateTime;
+            // You can use the selectedDateTime as needed.
+          }
+        });
+      }
+      return null;
+    });
     if (picked != null && picked != selectedDate) {
       setState(() {
         selectedDate = picked;
-        EasyLoading.showInfo("Saving Changes");
       });
     }
     return picked;
   }
 
   rescheduleAppointment(selectedDate, potId) async {
+    EasyLoading.showInfo("Saving Changes");
     final formData = FormData.fromMap({
       'pot_id': potId,
-      'appointment_date': DateTime.now().toIso8601String(),
-      'appointment_time': 1,
+      'appointment_date': DateFormat("dd-MM-yyyy").format(selectedDate),
+      // 'appointment_date': DateTime.now().toIso8601String(),
+      'appointment_time': DateFormat("kk:mm").format(selectedDate),
     });
+    print(formData.fields);
     final Response response = await dio.post(
       'https://crm.mygeeks.net.au/api/v1/my_tasks_reschedule',
       data: formData,
@@ -197,13 +227,18 @@ class _BodyState extends State<Body> {
     );
     print(response.data);
     if (response.statusCode == 200) {
-      EasyLoading.showSuccess("Saved");
+      var responseData = jsonDecode(jsonEncode(response.data)) as Map;
+      print(responseData);
+      EasyLoading.showInfo("${responseData['message']}");
+      setState(() {
+        allTasks = _getAgentTasks();
+      });
     }
     EasyLoading.dismiss();
   }
 
-  _saveJobSheet({
-      job_id,
+  _saveJobSheet(
+      {job_id,
       comment_id,
       comment_notes,
       status,
@@ -247,8 +282,8 @@ class _BodyState extends State<Body> {
     }
   }
 
-  acceptTask({followup_id}) async {
-    final formData = FormData.fromMap({'followup_id': followup_id});
+  acceptTask({followupId}) async {
+    final formData = FormData.fromMap({'followup_id': followupId});
     final Response response = await dio.post(
       'https://crm.mygeeks.net.au/api/v1/my_tasks_accept',
       data: formData,
@@ -259,6 +294,9 @@ class _BodyState extends State<Body> {
     );
     if (response.statusCode == 200) {
       var responseData = jsonDecode(jsonEncode(response.data)) as Map;
+      setState(() {
+        allTasks = _getAgentTasks();
+      });
       EasyLoading.showInfo("${responseData['message']}");
     } else {
       EasyLoading.showError("Missing Data");
@@ -271,12 +309,50 @@ class _BodyState extends State<Body> {
       'https://crm.mygeeks.net.au/api/v1/my_tasks_reject',
       data: formData,
       onSendProgress: (int sent, int total) {
-        print('${sent / total}');
         EasyLoading.showProgress(sent / total);
       },
     );
     if (response.statusCode == 200) {
       var responseData = jsonDecode(jsonEncode(response.data)) as Map;
+      print(responseData);
+      EasyLoading.showInfo("${responseData['message']}");
+      setState(() {
+        allTasks = _getAgentTasks();
+      });
+    } else {
+      EasyLoading.showError("Missing Data");
+    }
+  }
+
+  createAnInvoice({followupId, jobId}) async {
+    final SharedPreferences prefs = await SharedPreferences.getInstance();
+    var user = json.decode(prefs.getString('user')!) as Map;
+    final formData = FormData.fromMap({
+      'user_id': user['id'],
+      'job_id': jobId,
+      'call_charge_frequency': followupId,
+      'hourly_service_charge': _hoursSpentController.text,
+      'hours': _hoursSpentController.text,
+      'visiting_fee': _visitingFeeController.text,
+      'discount': _discountController.text,
+      'gst': _hasTax ? 0.1 * double.parse(_hoursSpentController.text) : 0,
+      'card_processing_fee': _hasCardProcessing
+          ? 0.025 * double.parse(_hoursSpentController.text)
+          : 0,
+      'total_amount': double.parse(_hoursSpentController.text) +
+          double.parse(_visitingFeeController.text) +
+          double.parse(_discountController.text),
+    });
+    final Response response = await dio.post(
+      'https://crm.mygeeks.net.au/api/v1/add_an_invoice',
+      data: formData,
+      onSendProgress: (int sent, int total) {
+        EasyLoading.showProgress(sent / total);
+      },
+    );
+    if (response.statusCode == 200) {
+      var responseData = jsonDecode(jsonEncode(response.data)) as Map;
+      print(responseData);
       EasyLoading.showInfo("${responseData['message']}");
     } else {
       EasyLoading.showError("Missing Data");
@@ -285,12 +361,16 @@ class _BodyState extends State<Body> {
 
   Future<void> _handleRefresh() {
     return _getAgentTasks().then((value) {
+      setState(() {
+        allTasks = _getAgentTasks();
+      });
       _refreshIndicatorKey.currentState!.show();
     });
   }
 
   @override
   void initState() {
+    allTasks = _getAgentTasks();
     super.initState();
     _videoController = VideoPlayerController.networkUrl(Uri.parse(
         'https://flutter.github.io/assets-for-api-docs/assets/videos/bee.mp4'))
@@ -299,7 +379,6 @@ class _BodyState extends State<Body> {
         setState(() {});
       });
     // WidgetsBinding.instance.addPostFrameCallback((_) => _getAgentTasks());
-    allTasks = _getAgentTasks();
     _controller = VideoPlayerController.networkUrl(Uri.parse(
         'https://flutter.github.io/assets-for-api-docs/assets/videos/bee.mp4'))
       ..initialize().then((_) {
@@ -494,7 +573,7 @@ class _BodyState extends State<Body> {
                           color: dataSnapshot
                                       .data!.data!.followUps![index].accepted ==
                                   'yes'
-                              ? Colors.white70
+                              ? Colors.green[100]
                               : Colors.white,
                           child: SizedBox(
                               height: 260.0,
@@ -518,100 +597,131 @@ class _BodyState extends State<Body> {
                                                     builder: (context) =>
                                                         StatefulBuilder(builder:
                                                             (BuildContext
-                                                        context,
-                                                            StateSetter
-                                                            setState /*You can rename this!*/) {
+                                                                    context,
+                                                                StateSetter
+                                                                    setState /*You can rename this!*/) {
                                                           return SizedBox(
-                                                            height: MediaQuery.of(context)
-                                                                .size
-                                                                .height *
+                                                            height: MediaQuery.of(
+                                                                        context)
+                                                                    .size
+                                                                    .height *
                                                                 0.85,
-                                                            child:
-                                                            Padding(
-                                                                padding: const EdgeInsets.all(15),
-                                                                child: FutureBuilder<AllJobSheets?>(
+                                                            child: Padding(
+                                                                padding:
+                                                                    const EdgeInsets
+                                                                            .all(
+                                                                        15),
+                                                                child: FutureBuilder<
+                                                                        AllJobSheets?>(
                                                                     future: _getAllJobSheets(
                                                                         commentId: dataSnapshot
                                                                             .data!
                                                                             .data!
                                                                             .followUps![
-                                                                        index]
+                                                                                index]
                                                                             .commentId,
                                                                         jobId: dataSnapshot
                                                                             .data!
                                                                             .data!
                                                                             .followUps![
-                                                                        index]
+                                                                                index]
                                                                             .commentsJobId),
-                                                                    builder: (context, snapshot) {
-                                                                      if(snapshot.hasData) {
-                                                                        _videoController = VideoPlayerController.networkUrl(Uri.parse(
-                                                                            "${snapshot.data!.data![index].videoUrl}"));
-                                                                        return ListView.builder(
-                                                                          itemCount:
-                                                                          snapshot.data!.data?.length,
-                                                                          itemBuilder: (context, index) => Padding(
-                                                                            padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 10),
+                                                                    builder:
+                                                                        (context,
+                                                                            snapshot) {
+                                                                      if (snapshot
+                                                                          .hasData) {
+                                                                        _videoController =
+                                                                            VideoPlayerController.networkUrl(Uri.parse("${snapshot.data!.data![index].videoUrl}"));
+                                                                        return ListView
+                                                                            .builder(
+                                                                          itemCount: snapshot
+                                                                              .data!
+                                                                              .data
+                                                                              ?.length,
+                                                                          itemBuilder: (context, index) =>
+                                                                              Padding(
+                                                                            padding:
+                                                                                const EdgeInsets.symmetric(vertical: 10, horizontal: 10),
                                                                             child: Card(
                                                                                 child: Padding(
-                                                                                  padding: const EdgeInsets.all(15.0),
-                                                                                  child: Column(
+                                                                              padding: const EdgeInsets.all(15.0),
+                                                                              child: Column(
+                                                                                children: [
+                                                                                  Row(
                                                                                     children: [
-                                                                                      Row(
-                                                                                        children: [
-                                                                                          Expanded(child: AutoSizeText("Job Sheet #${snapshot.data!.data![index].id}", style: GoogleFonts.abel(fontSize: 20, fontWeight: FontWeight.w900, color: Colors.blue),)),],
-                                                                                      ),
-                                                                                      Row(
-                                                                                        children: [
-                                                                                          Expanded(child: AutoSizeText("${snapshot.data!.data![index].notes}")),
-                                                                                        ],
-                                                                                      ),
-                                                                                      Row(
-                                                                                        children: [
-                                                                                          Expanded(child: AutoSizeText(DateFormat('dd-MMMM-yyyy hh:mm:ss').format(DateTime.parse(snapshot.data!.data![index].createdAt!)))),
-                                                                                        ],
-                                                                                      ),
-                                                                                      const SizedBox(height: 20,),
-                                                                                      Row(
-                                                                                        children: [
-                                                                                          Expanded(child: Image.network(
-                                                                                            "${snapshot.data!.data![index].pictureUrl}",
-                                                                                            // When image is loading from the server it takes some time
-                                                                                            // So we will show progress indicator while loading
-                                                                                            loadingBuilder: (BuildContext context, Widget child,
-                                                                                                ImageChunkEvent? loadingProgress) {
-                                                                                              if (loadingProgress == null) return child;
-                                                                                              return Center(
-                                                                                                child: CircularProgressIndicator(
-                                                                                                  value: loadingProgress.expectedTotalBytes != null
-                                                                                                      ? loadingProgress.cumulativeBytesLoaded /
-                                                                                                      loadingProgress.expectedTotalBytes!
-                                                                                                      : null,
-                                                                                                ),
-                                                                                              );
-                                                                                            },
-                                                                                          )),
-                                                                                          Expanded(child: _videoController.value.isInitialized
-                                                                                              ? AspectRatio(
-                                                                                            aspectRatio: _videoController.value.aspectRatio,
-                                                                                            child: VideoPlayer(_videoController),
-                                                                                          ): Container()),
-                                                                                        ],
-                                                                                      ),
-                                                                                      const SizedBox(height: 20,),
-                                                                                      Row(
-                                                                                        children: [
-                                                                                          Expanded(child: AutoSizeText("${snapshot.data!.data![index].status}")),
-                                                                                        ],
-                                                                                      ),
+                                                                                      Expanded(
+                                                                                          child: AutoSizeText(
+                                                                                        "Job Sheet #${snapshot.data!.data![index].id}",
+                                                                                        style: GoogleFonts.abel(fontSize: 20, fontWeight: FontWeight.w900, color: Colors.blue),
+                                                                                      )),
                                                                                     ],
                                                                                   ),
-                                                                                )
-                                                                            ),
+                                                                                  Row(
+                                                                                    children: [
+                                                                                      Expanded(child: AutoSizeText("${snapshot.data!.data![index].notes}")),
+                                                                                    ],
+                                                                                  ),
+                                                                                  Row(
+                                                                                    children: [
+                                                                                      Expanded(child: AutoSizeText(DateFormat('dd-MMMM-yyyy hh:mm:ss').format(DateTime.parse(snapshot.data!.data![index].createdAt!)))),
+                                                                                    ],
+                                                                                  ),
+                                                                                  const SizedBox(
+                                                                                    height: 20,
+                                                                                  ),
+                                                                                  Row(
+                                                                                    children: [
+                                                                                      Expanded(
+                                                                                          child: Image.network(
+                                                                                        "${snapshot.data!.data![index].pictureUrl}",
+                                                                                        errorBuilder: (BuildContext context, Object exception, stackTrace) {
+                                                                                          return Text(
+                                                                                            'Image Load error',
+                                                                                            style: GoogleFonts.abyssinicaSil(),
+                                                                                          );
+                                                                                        },
+                                                                                        // When image is loading from the server it takes some time
+                                                                                        // So we will show progress indicator while loading
+                                                                                        loadingBuilder: (BuildContext context, Widget child, ImageChunkEvent? loadingProgress) {
+                                                                                          if (loadingProgress == null) return child;
+                                                                                          return Center(
+                                                                                            child: CircularProgressIndicator(
+                                                                                              value: loadingProgress.expectedTotalBytes != null ? loadingProgress.cumulativeBytesLoaded / loadingProgress.expectedTotalBytes! : null,
+                                                                                            ),
+                                                                                          );
+                                                                                        },
+                                                                                      )),
+                                                                                      Expanded(
+                                                                                          child: _videoController.value.isInitialized
+                                                                                              ? AspectRatio(
+                                                                                                  aspectRatio: _videoController.value.aspectRatio,
+                                                                                                  child: VideoPlayer(_videoController),
+                                                                                                )
+                                                                                              : Container()),
+                                                                                    ],
+                                                                                  ),
+                                                                                  const SizedBox(
+                                                                                    height: 20,
+                                                                                  ),
+                                                                                  Row(
+                                                                                    children: [
+                                                                                      Expanded(child: AutoSizeText(StringUtils.capitalize(snapshot.data!.data![index].status!))),
+                                                                                    ],
+                                                                                  ),
+                                                                                ],
+                                                                              ),
+                                                                            )),
                                                                           ),
                                                                         );
                                                                       } else {
-                                                                        return const AutoSizeText("No data");
+                                                                        return Column(
+                                                                          crossAxisAlignment: CrossAxisAlignment.center,
+                                                                          children: [
+                                                                            AutoSizeText(
+                                                                              "No data", style: GoogleFonts.alumniSansPinstripe(),),
+                                                                          ],
+                                                                        );
                                                                       }
                                                                     })),
                                                           );
@@ -711,7 +821,7 @@ class _BodyState extends State<Body> {
                                                           EasyLoading.showInfo(
                                                               "Accepting task");
                                                           acceptTask(
-                                                              followup_id:
+                                                              followupId:
                                                                   dataSnapshot
                                                                       .data!
                                                                       .data!
@@ -748,7 +858,13 @@ class _BodyState extends State<Body> {
                                                     ? GestureDetector(
                                                         onTap: () {
                                                           rejectTask(
-                                                              followup_id: 1);
+                                                              followup_id:
+                                                                  dataSnapshot
+                                                                      .data!
+                                                                      .data!
+                                                                      .followUps![
+                                                                          index]
+                                                                      .id);
                                                           EasyLoading.showInfo(
                                                               "Rejecting task");
                                                         },
@@ -773,16 +889,18 @@ class _BodyState extends State<Body> {
                                                       )
                                                     : Container(),
                                                 GestureDetector(
-                                                  onTap: () {
-                                                    _selectDate(context)
+                                                  onTap: () async {
+                                                    await _selectDate(
+                                                            context,
+                                                            dataSnapshot
+                                                                .data!
+                                                                .data!
+                                                                .followUps![
+                                                                    index]
+                                                                .salesId)
                                                         .then((value) {
-                                                      rescheduleAppointment(
-                                                          value,
-                                                          dataSnapshot
-                                                              .data!
-                                                              .data!
-                                                              .followUps![index]
-                                                              .salesId);
+                                                      print("selected ok");
+                                                      print(value);
                                                       return value;
                                                     });
                                                   },
@@ -1083,7 +1201,7 @@ class _BodyState extends State<Body> {
                                                                                 Colors.white),
                                                                       ),
                                                                       onPressed:
-                                                                          () {
+                                                                          () async {
                                                                         EasyLoading
                                                                             .show();
                                                                         print(photo
@@ -1094,13 +1212,19 @@ class _BodyState extends State<Body> {
                                                                             .text);
                                                                         print(
                                                                             dropdownValue);
+                                                                        final SharedPreferences
+                                                                            prefs =
+                                                                            await SharedPreferences.getInstance();
+                                                                        var user =
+                                                                            json.decode(prefs.getString('user')!)
+                                                                                as Map;
                                                                         _saveJobSheet(
                                                                             job_id:
                                                                                 dataSnapshot.data!.data!.followUps![index].commentsJobId,
                                                                             comment_id: dataSnapshot.data!.data!.followUps![index].commentId,
                                                                             comment_notes: _notesController.text,
                                                                             status: dropdownValue.toLowerCase(),
-                                                                            user_id: 1,
+                                                                            user_id: user['id'],
                                                                             photo: photo,
                                                                             video: cameraVideo);
                                                                         EasyLoading
@@ -1155,203 +1279,244 @@ class _BodyState extends State<Body> {
                                                                           .size
                                                                           .height *
                                                                       0.85,
-                                                                  child: Padding(
-                                                                    padding: const EdgeInsets.all(15.0),
-                                                                    child: Column(
+                                                                  child:
+                                                                      Padding(
+                                                                    padding: const EdgeInsets
+                                                                            .all(
+                                                                        15.0),
+                                                                    child:
+                                                                        Column(
                                                                       crossAxisAlignment:
                                                                           CrossAxisAlignment
                                                                               .center,
                                                                       children: [
                                                                         Text(
-                                                                            "Add an Invoice",
-                                                                            style: GoogleFonts.abel(
-                                                                          fontSize: 30,
-                                                                          fontWeight: FontWeight.bold),
-                                                                          ),
-                                                                        const SizedBox(
-                                                                          height:
-                                                                          20,
-                                                                        ),
-                                                                        TextFormField(
-                                                                          controller:
-                                                                          _serviceChargeController,
-                                                                          maxLines:
-                                                                          1,
-                                                                          decoration:
-                                                                          InputDecoration(
-                                                                            border: OutlineInputBorder(
-                                                                              borderRadius: BorderRadius.circular(15.0),
-                                                                            ),
-                                                                            // hintText: 'Tell us about yourself',
-                                                                            labelText: 'Service Charge',
-                                                                            labelStyle: GoogleFonts.abel(),
-                                                                            floatingLabelBehavior: FloatingLabelBehavior.always,
-                                                                            contentPadding: const EdgeInsets.all(5.0),
-                                                                          ),
+                                                                          "Add an Invoice",
+                                                                          style: GoogleFonts.abel(
+                                                                              fontSize: 30,
+                                                                              fontWeight: FontWeight.bold),
                                                                         ),
                                                                         const SizedBox(
                                                                           height:
-                                                                          20,
+                                                                              20,
                                                                         ),
                                                                         TextFormField(
                                                                           controller:
-                                                                          _hoursSpentController,
+                                                                              _serviceChargeController,
                                                                           maxLines:
-                                                                          1,
+                                                                              1,
                                                                           decoration:
-                                                                          InputDecoration(
-                                                                            border: OutlineInputBorder(
+                                                                              InputDecoration(
+                                                                            border:
+                                                                                OutlineInputBorder(
                                                                               borderRadius: BorderRadius.circular(15.0),
                                                                             ),
                                                                             // hintText: 'Tell us about yourself',
-                                                                            labelText: 'Hours Spent',
-                                                                            labelStyle: GoogleFonts.abel(),
-                                                                            floatingLabelBehavior: FloatingLabelBehavior.always,
-                                                                            contentPadding: const EdgeInsets.all(5.0),
+                                                                            labelText:
+                                                                                'Service Charge',
+                                                                            labelStyle:
+                                                                                GoogleFonts.abel(),
+                                                                            floatingLabelBehavior:
+                                                                                FloatingLabelBehavior.always,
+                                                                            contentPadding:
+                                                                                const EdgeInsets.all(5.0),
                                                                           ),
                                                                         ),
                                                                         const SizedBox(
                                                                           height:
-                                                                          20,
+                                                                              20,
                                                                         ),
                                                                         TextFormField(
                                                                           controller:
-                                                                          _visitingFeeController,
+                                                                              _hoursSpentController,
                                                                           maxLines:
-                                                                          1,
+                                                                              1,
                                                                           decoration:
-                                                                          InputDecoration(
-                                                                            border: OutlineInputBorder(
+                                                                              InputDecoration(
+                                                                            border:
+                                                                                OutlineInputBorder(
                                                                               borderRadius: BorderRadius.circular(15.0),
                                                                             ),
                                                                             // hintText: 'Tell us about yourself',
-                                                                            labelText: 'Visiting Fee',
-                                                                            labelStyle: GoogleFonts.abel(),
-                                                                            floatingLabelBehavior: FloatingLabelBehavior.always,
-                                                                            contentPadding: const EdgeInsets.all(5.0),
+                                                                            labelText:
+                                                                                'Hours Spent',
+                                                                            labelStyle:
+                                                                                GoogleFonts.abel(),
+                                                                            floatingLabelBehavior:
+                                                                                FloatingLabelBehavior.always,
+                                                                            contentPadding:
+                                                                                const EdgeInsets.all(5.0),
                                                                           ),
                                                                         ),
                                                                         const SizedBox(
                                                                           height:
-                                                                          20,
+                                                                              20,
                                                                         ),
                                                                         TextFormField(
                                                                           controller:
-                                                                          _discountController,
+                                                                              _visitingFeeController,
                                                                           maxLines:
-                                                                          1,
+                                                                              1,
                                                                           decoration:
-                                                                          InputDecoration(
-                                                                            border: OutlineInputBorder(
+                                                                              InputDecoration(
+                                                                            border:
+                                                                                OutlineInputBorder(
                                                                               borderRadius: BorderRadius.circular(15.0),
                                                                             ),
                                                                             // hintText: 'Tell us about yourself',
-                                                                            labelText: 'Discount Percentage',
-                                                                            labelStyle: GoogleFonts.abel(),
-                                                                            floatingLabelBehavior: FloatingLabelBehavior.always,
-                                                                            contentPadding: const EdgeInsets.all(5.0),
+                                                                            labelText:
+                                                                                'Visiting Fee',
+                                                                            labelStyle:
+                                                                                GoogleFonts.abel(),
+                                                                            floatingLabelBehavior:
+                                                                                FloatingLabelBehavior.always,
+                                                                            contentPadding:
+                                                                                const EdgeInsets.all(5.0),
+                                                                          ),
+                                                                        ),
+                                                                        const SizedBox(
+                                                                          height:
+                                                                              20,
+                                                                        ),
+                                                                        TextFormField(
+                                                                          controller:
+                                                                              _discountController,
+                                                                          maxLines:
+                                                                              1,
+                                                                          decoration:
+                                                                              InputDecoration(
+                                                                            border:
+                                                                                OutlineInputBorder(
+                                                                              borderRadius: BorderRadius.circular(15.0),
+                                                                            ),
+                                                                            // hintText: 'Tell us about yourself',
+                                                                            labelText:
+                                                                                'Discount Percentage',
+                                                                            labelStyle:
+                                                                                GoogleFonts.abel(),
+                                                                            floatingLabelBehavior:
+                                                                                FloatingLabelBehavior.always,
+                                                                            contentPadding:
+                                                                                const EdgeInsets.all(5.0),
                                                                           ),
                                                                         ),
                                                                         CheckboxListTile(
                                                                           title:
-                                                                          Text(
+                                                                              Text(
                                                                             "GST Applicable",
-                                                                            style: GoogleFonts.abel(),
+                                                                            style:
+                                                                                GoogleFonts.abel(),
                                                                           ),
                                                                           subtitle:
-                                                                          Text(
+                                                                              Text(
                                                                             "10%",
-                                                                            style: GoogleFonts.sourceCodePro(color: Colors.green),
+                                                                            style:
+                                                                                GoogleFonts.sourceCodePro(color: Colors.green),
                                                                           ),
-                                                                          value:
-                                                                          _hasTax ? true : false,
+                                                                          value: _hasTax
+                                                                              ? true
+                                                                              : false,
                                                                           onChanged:
                                                                               (newValue) {
                                                                             setState(() {
-                                                                              if(_hasTax == true){
+                                                                              if (_hasTax == true) {
                                                                                 _hasTax = false;
-                                                                              }else{
+                                                                              } else {
                                                                                 _hasTax = true;
                                                                               }
                                                                             });
                                                                           },
                                                                           controlAffinity:
-                                                                          ListTileControlAffinity.leading, //  <-- leading Checkbox
+                                                                              ListTileControlAffinity.leading, //  <-- leading Checkbox
                                                                         ),
                                                                         CheckboxListTile(
                                                                           title:
-                                                                          Text(
+                                                                              Text(
                                                                             "Card Processing Applicable",
-                                                                            style: GoogleFonts.abel(),
+                                                                            style:
+                                                                                GoogleFonts.abel(),
                                                                           ),
                                                                           subtitle:
-                                                                          Text(
+                                                                              Text(
                                                                             "2.5% fee",
-                                                                            style: GoogleFonts.sourceCodePro(color: Colors.green),
+                                                                            style:
+                                                                                GoogleFonts.sourceCodePro(color: Colors.green),
                                                                           ),
-                                                                          value:
-                                                                          _hasCardProcessing ? true : false,
+                                                                          value: _hasCardProcessing
+                                                                              ? true
+                                                                              : false,
                                                                           onChanged:
                                                                               (newValue) {
                                                                             setState(() {
-                                                                              if(_hasCardProcessing == true){
+                                                                              if (_hasCardProcessing == true) {
                                                                                 _hasCardProcessing = false;
-                                                                              }else{
+                                                                              } else {
                                                                                 _hasCardProcessing = true;
                                                                               }
                                                                             });
                                                                           },
                                                                           controlAffinity:
-                                                                          ListTileControlAffinity.leading, //  <-- leading Checkbox
+                                                                              ListTileControlAffinity.leading, //  <-- leading Checkbox
                                                                         ),
                                                                         const SizedBox(
                                                                           height:
-                                                                          20,
+                                                                              20,
                                                                         ),
                                                                         TextFormField(
                                                                           readOnly:
-                                                                          true,
+                                                                              true,
                                                                           controller:
-                                                                          _notesController,
+                                                                              _notesController,
                                                                           maxLines:
-                                                                          1,
+                                                                              1,
                                                                           decoration:
-                                                                          InputDecoration(
-                                                                            border: OutlineInputBorder(
+                                                                              InputDecoration(
+                                                                            border:
+                                                                                OutlineInputBorder(
                                                                               borderRadius: BorderRadius.circular(15.0),
                                                                             ),
                                                                             // hintText: 'Tell us about yourself',
-                                                                            labelText: 'Total Amount',
-                                                                            floatingLabelBehavior: FloatingLabelBehavior.always,
-                                                                            contentPadding: const EdgeInsets.all(5.0),
+                                                                            labelText:
+                                                                                'Total Amount',
+                                                                            floatingLabelBehavior:
+                                                                                FloatingLabelBehavior.always,
+                                                                            contentPadding:
+                                                                                const EdgeInsets.all(5.0),
                                                                           ),
                                                                         ),
                                                                         const SizedBox(
                                                                           height:
-                                                                          50,
+                                                                              50,
                                                                         ),
                                                                         SizedBox(
                                                                           width:
-                                                                          MediaQuery.of(context).size.width * 0.75,
+                                                                              MediaQuery.of(context).size.width * 0.75,
                                                                           height:
-                                                                          40.0,
+                                                                              40.0,
                                                                           child:
-                                                                          ElevatedButton.icon(
-                                                                            icon: const Icon(
+                                                                              ElevatedButton.icon(
+                                                                            icon:
+                                                                                const Icon(
                                                                               Icons.save,
                                                                               color: Colors.white,
                                                                             ),
-                                                                            label: Text(
+                                                                            label:
+                                                                                Text(
                                                                               "Save",
                                                                               style: GoogleFonts.aBeeZee(color: Colors.white),
                                                                             ),
-                                                                            onPressed: () async {
+                                                                            onPressed:
+                                                                                () async {
                                                                               EasyLoading.show();
                                                                               EasyLoading.dismiss();
-
+                                                                              createAnInvoice(
+                                                                                jobId: dataSnapshot.data!.data!.followUps![index].commentsJobId,
+                                                                                followupId: dataSnapshot.data!.data!.followUps![index].id,
+                                                                              );
                                                                               Navigator.of(context).pop();
                                                                             },
-                                                                            style: ElevatedButton.styleFrom(
+                                                                            style:
+                                                                                ElevatedButton.styleFrom(
                                                                               backgroundColor: Colors.green,
                                                                               shape: RoundedRectangleBorder(
                                                                                 borderRadius: BorderRadius.circular(32.0),
@@ -1446,7 +1611,7 @@ class _BodyState extends State<Body> {
                                       .appointmentsFollowUps![index]
                                       .followUpsAccepted ==
                                   'yes'
-                              ? Colors.white70
+                              ? Colors.green[100]
                               : Colors.white,
                           child: SizedBox(
                               height: 260.0,
@@ -1465,109 +1630,140 @@ class _BodyState extends State<Body> {
                                           children: [
                                             GestureDetector(
                                               onTap: () {
-                                                        showCupertinoModalBottomSheet(
-                                                            context: context,
-                                                            builder: (context) =>
-                                                                StatefulBuilder(builder:
-                                                                    (BuildContext
-                                                                            context,
-                                                                        StateSetter
-                                                                            setState /*You can rename this!*/) {
-                                                                  return SizedBox(
-                                                                    height: MediaQuery.of(context)
-                                                                            .size
-                                                                            .height *
-                                                                        0.85,
-                                                                    child:
-                                                                        Padding(
-                                                                            padding: const EdgeInsets.all(15),
-                                                                            child: FutureBuilder<AllJobSheets?>(
-                                                                                future: _getAllJobSheets(
-                                                                                    commentId: dataSnapshot
-                                                                                        .data!
-                                                                                        .data!
-                                                                                        .appointmentsFollowUps![
-                                                                                    index]
-                                                                                        .followUpsCommentId,
-                                                                                    jobId: dataSnapshot
-                                                                                        .data!
-                                                                                        .data!
-                                                                                        .appointmentsFollowUps![
-                                                                                    index]
-                                                                                        .commentsJobId),
-                                                                                builder: (context, snapshot) {
-                                                                                  if(snapshot.hasData) {
-                                                                                    _videoController = VideoPlayerController.networkUrl(Uri.parse(
-                                                                                        "${snapshot.data!.data![index].videoUrl}"));
-                                                                                    return ListView.builder(
-                                                                                      itemCount:
-                                                                                      snapshot.data!.data?.length,
-                                                                                      itemBuilder: (context, index) => Padding(
-                                                                                        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 10),
-                                                                                        child: Card(
-                                                                                            child: Padding(
-                                                                                              padding: const EdgeInsets.all(15.0),
-                                                                                              child: Column(
-                                                                                                children: [
-                                                                                                  Row(
-                                                                                                    children: [
-                                                                                                      Expanded(child: AutoSizeText("Job Sheet #${snapshot.data!.data![index].id}", style: GoogleFonts.abel(fontSize: 20, fontWeight: FontWeight.w900, color: Colors.blue),)),],
-                                                                                                  ),
-                                                                                                  Row(
-                                                                                                    children: [
-                                                                                                      Expanded(child: AutoSizeText("${snapshot.data!.data![index].notes}")),
-                                                                                                    ],
-                                                                                                  ),
-                                                                                                  Row(
-                                                                                                    children: [
-                                                                                                      Expanded(child: AutoSizeText(DateFormat('dd-MMMM-yyyy hh:mm:ss').format(DateTime.parse(snapshot.data!.data![index].createdAt!)))),
-                                                                                                    ],
-                                                                                                  ),
-                                                                                                  const SizedBox(height: 20,),
-                                                                                                  Row(
-                                                                                                    children: [
-                                                                                                      Expanded(child: Image.network(
-                                                                                                          "${snapshot.data!.data![index].pictureUrl}",
-                                                                                                        // When image is loading from the server it takes some time
-                                                                                                        // So we will show progress indicator while loading
-                                                                                                        loadingBuilder: (BuildContext context, Widget child,
-                                                                                                            ImageChunkEvent? loadingProgress) {
-                                                                                                          if (loadingProgress == null) return child;
-                                                                                                          return Center(
-                                                                                                            child: CircularProgressIndicator(
-                                                                                                              value: loadingProgress.expectedTotalBytes != null
-                                                                                                                  ? loadingProgress.cumulativeBytesLoaded /
-                                                                                                                  loadingProgress.expectedTotalBytes!
-                                                                                                                  : null,
-                                                                                                            ),
-                                                                                                          );
-                                                                                                        },
-                                                                                                      )),
-                                                                                                      Expanded(child: _videoController.value.isInitialized
-                                                                                                          ? AspectRatio(
-                                                                                                        aspectRatio: _videoController.value.aspectRatio,
-                                                                                                        child: VideoPlayer(_videoController),
-                                                                                                      ): Container()),
-                                                                                                    ],
-                                                                                                  ),
-                                                                                                  const SizedBox(height: 20,),
-                                                                                                  Row(
-                                                                                                    children: [
-                                                                                                      Expanded(child: AutoSizeText("${snapshot.data!.data![index].status}")),
-                                                                                                    ],
-                                                                                                  ),
-                                                                                                ],
-                                                                                              ),
-                                                                                            )
-                                                                                        ),
-                                                                                      ),
-                                                                                    );
-                                                                                  } else {
-                                                                                    return const AutoSizeText("No data");
-                                                                                  }
-                                                                                })),
-                                                                  );
-                                                                }));
+                                                showCupertinoModalBottomSheet(
+                                                    context: context,
+                                                    builder: (context) =>
+                                                        StatefulBuilder(builder:
+                                                            (BuildContext
+                                                                    context,
+                                                                StateSetter
+                                                                    setState /*You can rename this!*/) {
+                                                          return SizedBox(
+                                                            height: MediaQuery.of(
+                                                                        context)
+                                                                    .size
+                                                                    .height *
+                                                                0.85,
+                                                            child: Padding(
+                                                                padding:
+                                                                    const EdgeInsets
+                                                                            .all(
+                                                                        15),
+                                                                child: FutureBuilder<
+                                                                        AllJobSheets?>(
+                                                                    future: _getAllJobSheets(
+                                                                        commentId: dataSnapshot
+                                                                            .data!
+                                                                            .data!
+                                                                            .appointmentsFollowUps![
+                                                                                index]
+                                                                            .followUpsCommentId,
+                                                                        jobId: dataSnapshot
+                                                                            .data!
+                                                                            .data!
+                                                                            .appointmentsFollowUps![
+                                                                                index]
+                                                                            .commentsJobId),
+                                                                    builder:
+                                                                        (context,
+                                                                            snapshot) {
+                                                                      if (snapshot
+                                                                          .hasData) {
+                                                                        _videoController =
+                                                                            VideoPlayerController.networkUrl(Uri.parse("${snapshot.data!.data![index].videoUrl}"));
+                                                                        return ListView
+                                                                            .builder(
+                                                                          itemCount: snapshot
+                                                                              .data!
+                                                                              .data
+                                                                              ?.length,
+                                                                          itemBuilder: (context, index) =>
+                                                                              Padding(
+                                                                            padding:
+                                                                                const EdgeInsets.symmetric(vertical: 10, horizontal: 10),
+                                                                            child: Card(
+                                                                                child: Padding(
+                                                                              padding: const EdgeInsets.all(15.0),
+                                                                              child: Column(
+                                                                                children: [
+                                                                                  Row(
+                                                                                    children: [
+                                                                                      Expanded(
+                                                                                          child: AutoSizeText(
+                                                                                        "Job Sheet #${snapshot.data!.data![index].id}",
+                                                                                        style: GoogleFonts.abel(fontSize: 20, fontWeight: FontWeight.w900, color: Colors.blue),
+                                                                                      )),
+                                                                                    ],
+                                                                                  ),
+                                                                                  Row(
+                                                                                    children: [
+                                                                                      Expanded(child: AutoSizeText("${snapshot.data!.data![index].notes}")),
+                                                                                    ],
+                                                                                  ),
+                                                                                  Row(
+                                                                                    children: [
+                                                                                      Expanded(child: AutoSizeText(DateFormat('dd-MMMM-yyyy hh:mm:ss').format(DateTime.parse(snapshot.data!.data![index].createdAt!)))),
+                                                                                    ],
+                                                                                  ),
+                                                                                  const SizedBox(
+                                                                                    height: 20,
+                                                                                  ),
+                                                                                  Row(
+                                                                                    children: [
+                                                                                      Expanded(
+                                                                                          child: Image.network(
+                                                                                        "${snapshot.data!.data![index].pictureUrl}",
+                                                                                        errorBuilder: (BuildContext context, Object exception, stackTrace) {
+                                                                                          return Text(
+                                                                                            'Image Load error',
+                                                                                            style: GoogleFonts.abyssinicaSil(),
+                                                                                          );
+                                                                                        },
+                                                                                        // When image is loading from the server it takes some time
+                                                                                        // So we will show progress indicator while loading
+                                                                                        loadingBuilder: (BuildContext context, Widget child, ImageChunkEvent? loadingProgress) {
+                                                                                          if (loadingProgress == null) return child;
+                                                                                          return Center(
+                                                                                            child: CircularProgressIndicator(
+                                                                                              value: loadingProgress.expectedTotalBytes != null ? loadingProgress.cumulativeBytesLoaded / loadingProgress.expectedTotalBytes! : null,
+                                                                                            ),
+                                                                                          );
+                                                                                        },
+                                                                                      )),
+                                                                                      Expanded(
+                                                                                          child: _videoController.value.isInitialized
+                                                                                              ? AspectRatio(
+                                                                                                  aspectRatio: _videoController.value.aspectRatio,
+                                                                                                  child: VideoPlayer(_videoController),
+                                                                                                )
+                                                                                              : Container()),
+                                                                                    ],
+                                                                                  ),
+                                                                                  const SizedBox(
+                                                                                    height: 20,
+                                                                                  ),
+                                                                                  Row(
+                                                                                    children: [
+                                                                                      Expanded(child: AutoSizeText(StringUtils.capitalize(snapshot.data!.data![index].status!))),
+                                                                                    ],
+                                                                                  ),
+                                                                                ],
+                                                                              ),
+                                                                            )),
+                                                                          ),
+                                                                        );
+                                                                      } else {
+                                                                        return Column(
+                                                                          crossAxisAlignment: CrossAxisAlignment.center,
+                                                                          children: [
+                                                                            AutoSizeText(
+                                                                                "No data", style: GoogleFonts.alumniSansPinstripe(),),
+                                                                          ],
+                                                                        );
+                                                                      }
+                                                                    })),
+                                                          );
+                                                        }));
                                               },
                                               child: AutoSizeText(
                                                   "${dataSnapshot.data!.data!.appointmentsFollowUps![index].appointmentsClientFname} ${dataSnapshot.data!.data!.appointmentsFollowUps![index].appointmentsClientLname}",
@@ -1608,7 +1804,7 @@ class _BodyState extends State<Body> {
                                               height: 20,
                                             ),
                                             AutoSizeText(
-                                                "${dataSnapshot.data!.data!.appointmentsFollowUps![index].appointmentsCreatedAt}",
+                                                "${dataSnapshot.data!.data!.appointmentsFollowUps![index].appointmentsAppointmentDate} ${dataSnapshot.data!.data!.appointmentsFollowUps![index].appointmentsAppointmentTime}",
                                                 style: GoogleFonts.changa(
                                                     fontSize: 12,
                                                     color: Colors.black54)),
@@ -1658,21 +1854,21 @@ class _BodyState extends State<Body> {
                                                 dataSnapshot
                                                             .data!
                                                             .data!
-                                                            .followUps![index]
-                                                            .accepted ==
+                                                            .appointmentsFollowUps![
+                                                                index]
+                                                            .followUpsAccepted ==
                                                         'no'
                                                     ? GestureDetector(
                                                         onTap: () {
                                                           EasyLoading.showInfo(
                                                               "Accepting task");
                                                           acceptTask(
-                                                              followup_id:
-                                                                  dataSnapshot
-                                                                      .data!
-                                                                      .data!
-                                                                      .appointmentsFollowUps![
-                                                                          index]
-                                                                      .id);
+                                                              followupId: dataSnapshot
+                                                                  .data!
+                                                                  .data!
+                                                                  .appointmentsFollowUps![
+                                                                      index]
+                                                                  .followUpsId);
                                                         },
                                                         child: Icon(
                                                           Icons
@@ -1705,7 +1901,12 @@ class _BodyState extends State<Body> {
                                                     ? GestureDetector(
                                                         onTap: () {
                                                           rejectTask(
-                                                              followup_id: 1);
+                                                              followup_id: dataSnapshot
+                                                                  .data!
+                                                                  .data!
+                                                                  .appointmentsFollowUps![
+                                                                      index]
+                                                                  .followUpsId);
                                                           EasyLoading.showInfo(
                                                               "Rejecting task");
                                                         },
@@ -1731,17 +1932,18 @@ class _BodyState extends State<Body> {
                                                       )
                                                     : Container(),
                                                 GestureDetector(
-                                                  onTap: () {
-                                                    _selectDate(context)
+                                                  onTap: () async {
+                                                    await _selectDate(
+                                                            context,
+                                                            dataSnapshot
+                                                                .data!
+                                                                .data!
+                                                                .appointmentsFollowUps![
+                                                                    index]
+                                                                .commentsSalesId)
                                                         .then((value) {
-                                                      rescheduleAppointment(
-                                                          value,
-                                                          dataSnapshot
-                                                              .data!
-                                                              .data!
-                                                              .appointmentsFollowUps![
-                                                                  index]
-                                                              .commentsSalesId);
+                                                      print("selected ok");
+                                                      print(value);
                                                       return value;
                                                     });
                                                   },
@@ -2111,207 +2313,251 @@ class _BodyState extends State<Body> {
                                                                           .height *
                                                                       0.85,
                                                                   child:
-                                                                      SingleChildScrollView(
+                                                                      Padding(
+                                                                    padding: const EdgeInsets
+                                                                            .all(
+                                                                        15.0),
                                                                     child:
-                                                                        Padding(
-                                                                      padding: const EdgeInsets
-                                                                              .all(
-                                                                          15.0),
-                                                                      child:
-                                                                          Column(
-                                                                        crossAxisAlignment:
-                                                                            CrossAxisAlignment.center,
-                                                                        children: [
-                                                                          Text(
-                                                                            "Add an Invoice",
+                                                                        Column(
+                                                                      crossAxisAlignment:
+                                                                          CrossAxisAlignment
+                                                                              .center,
+                                                                      children: [
+                                                                        Text(
+                                                                          "Add an Invoice",
+                                                                          style: GoogleFonts.abel(
+                                                                              fontSize: 30,
+                                                                              fontWeight: FontWeight.bold),
+                                                                        ),
+                                                                        const SizedBox(
+                                                                          height:
+                                                                              20,
+                                                                        ),
+                                                                        TextFormField(
+                                                                          controller:
+                                                                              _serviceChargeController,
+                                                                          maxLines:
+                                                                              1,
+                                                                          decoration:
+                                                                              InputDecoration(
+                                                                            border:
+                                                                                OutlineInputBorder(
+                                                                              borderRadius: BorderRadius.circular(15.0),
+                                                                            ),
+                                                                            // hintText: 'Tell us about yourself',
+                                                                            labelText:
+                                                                                'Service Charge',
+                                                                            labelStyle:
+                                                                                GoogleFonts.abel(),
+                                                                            floatingLabelBehavior:
+                                                                                FloatingLabelBehavior.always,
+                                                                            contentPadding:
+                                                                                const EdgeInsets.all(5.0),
+                                                                          ),
+                                                                        ),
+                                                                        const SizedBox(
+                                                                          height:
+                                                                              20,
+                                                                        ),
+                                                                        TextFormField(
+                                                                          controller:
+                                                                              _hoursSpentController,
+                                                                          maxLines:
+                                                                              1,
+                                                                          decoration:
+                                                                              InputDecoration(
+                                                                            border:
+                                                                                OutlineInputBorder(
+                                                                              borderRadius: BorderRadius.circular(15.0),
+                                                                            ),
+                                                                            // hintText: 'Tell us about yourself',
+                                                                            labelText:
+                                                                                'Hours Spent',
+                                                                            labelStyle:
+                                                                                GoogleFonts.abel(),
+                                                                            floatingLabelBehavior:
+                                                                                FloatingLabelBehavior.always,
+                                                                            contentPadding:
+                                                                                const EdgeInsets.all(5.0),
+                                                                          ),
+                                                                        ),
+                                                                        const SizedBox(
+                                                                          height:
+                                                                              20,
+                                                                        ),
+                                                                        TextFormField(
+                                                                          controller:
+                                                                              _visitingFeeController,
+                                                                          maxLines:
+                                                                              1,
+                                                                          decoration:
+                                                                              InputDecoration(
+                                                                            border:
+                                                                                OutlineInputBorder(
+                                                                              borderRadius: BorderRadius.circular(15.0),
+                                                                            ),
+                                                                            // hintText: 'Tell us about yourself',
+                                                                            labelText:
+                                                                                'Visiting Fee',
+                                                                            labelStyle:
+                                                                                GoogleFonts.abel(),
+                                                                            floatingLabelBehavior:
+                                                                                FloatingLabelBehavior.always,
+                                                                            contentPadding:
+                                                                                const EdgeInsets.all(5.0),
+                                                                          ),
+                                                                        ),
+                                                                        const SizedBox(
+                                                                          height:
+                                                                              20,
+                                                                        ),
+                                                                        TextFormField(
+                                                                          controller:
+                                                                              _discountController,
+                                                                          maxLines:
+                                                                              1,
+                                                                          decoration:
+                                                                              InputDecoration(
+                                                                            border:
+                                                                                OutlineInputBorder(
+                                                                              borderRadius: BorderRadius.circular(15.0),
+                                                                            ),
+                                                                            // hintText: 'Tell us about yourself',
+                                                                            labelText:
+                                                                                'Discount Percentage',
+                                                                            labelStyle:
+                                                                                GoogleFonts.abel(),
+                                                                            floatingLabelBehavior:
+                                                                                FloatingLabelBehavior.always,
+                                                                            contentPadding:
+                                                                                const EdgeInsets.all(5.0),
+                                                                          ),
+                                                                        ),
+                                                                        CheckboxListTile(
+                                                                          title:
+                                                                              Text(
+                                                                            "GST Applicable",
                                                                             style:
-                                                                                GoogleFonts.abel(fontSize: 30, fontWeight: FontWeight.bold),
+                                                                                GoogleFonts.abel(),
                                                                           ),
-                                                                          const SizedBox(
-                                                                            height:
-                                                                                20,
+                                                                          subtitle:
+                                                                              Text(
+                                                                            "10%",
+                                                                            style:
+                                                                                GoogleFonts.sourceCodePro(color: Colors.green),
                                                                           ),
-                                                                          TextFormField(
-                                                                            controller:
-                                                                                _notesController,
-                                                                            maxLines:
-                                                                                1,
-                                                                            decoration:
-                                                                                InputDecoration(
-                                                                              border: OutlineInputBorder(
-                                                                                borderRadius: BorderRadius.circular(15.0),
-                                                                              ),
-                                                                              // hintText: 'Tell us about yourself',
-                                                                              labelText: 'Service Charge',
-                                                                              labelStyle: GoogleFonts.abel(),
-                                                                              floatingLabelBehavior: FloatingLabelBehavior.always,
-                                                                              contentPadding: const EdgeInsets.all(5.0),
+                                                                          value: _hasTax
+                                                                              ? true
+                                                                              : false,
+                                                                          onChanged:
+                                                                              (newValue) {
+                                                                            setState(() {
+                                                                              if (_hasTax == true) {
+                                                                                _hasTax = false;
+                                                                              } else {
+                                                                                _hasTax = true;
+                                                                              }
+                                                                            });
+                                                                          },
+                                                                          controlAffinity:
+                                                                              ListTileControlAffinity.leading, //  <-- leading Checkbox
+                                                                        ),
+                                                                        CheckboxListTile(
+                                                                          title:
+                                                                              Text(
+                                                                            "Card Processing Applicable",
+                                                                            style:
+                                                                                GoogleFonts.abel(),
+                                                                          ),
+                                                                          subtitle:
+                                                                              Text(
+                                                                            "2.5% fee",
+                                                                            style:
+                                                                                GoogleFonts.sourceCodePro(color: Colors.green),
+                                                                          ),
+                                                                          value: _hasCardProcessing
+                                                                              ? true
+                                                                              : false,
+                                                                          onChanged:
+                                                                              (newValue) {
+                                                                            setState(() {
+                                                                              if (_hasCardProcessing == true) {
+                                                                                _hasCardProcessing = false;
+                                                                              } else {
+                                                                                _hasCardProcessing = true;
+                                                                              }
+                                                                            });
+                                                                          },
+                                                                          controlAffinity:
+                                                                              ListTileControlAffinity.leading, //  <-- leading Checkbox
+                                                                        ),
+                                                                        const SizedBox(
+                                                                          height:
+                                                                              20,
+                                                                        ),
+                                                                        TextFormField(
+                                                                          readOnly:
+                                                                              true,
+                                                                          controller:
+                                                                              _notesController,
+                                                                          maxLines:
+                                                                              1,
+                                                                          decoration:
+                                                                              InputDecoration(
+                                                                            border:
+                                                                                OutlineInputBorder(
+                                                                              borderRadius: BorderRadius.circular(15.0),
                                                                             ),
+                                                                            // hintText: 'Tell us about yourself',
+                                                                            labelText:
+                                                                                'Total Amount',
+                                                                            floatingLabelBehavior:
+                                                                                FloatingLabelBehavior.always,
+                                                                            contentPadding:
+                                                                                const EdgeInsets.all(5.0),
                                                                           ),
-                                                                          const SizedBox(
-                                                                            height:
-                                                                                20,
-                                                                          ),
-                                                                          TextFormField(
-                                                                            controller:
-                                                                                _notesController,
-                                                                            maxLines:
-                                                                                1,
-                                                                            decoration:
-                                                                                InputDecoration(
-                                                                              border: OutlineInputBorder(
-                                                                                borderRadius: BorderRadius.circular(15.0),
-                                                                              ),
-                                                                              // hintText: 'Tell us about yourself',
-                                                                              labelText: 'Hours Spent',
-                                                                              labelStyle: GoogleFonts.abel(),
-                                                                              floatingLabelBehavior: FloatingLabelBehavior.always,
-                                                                              contentPadding: const EdgeInsets.all(5.0),
+                                                                        ),
+                                                                        const SizedBox(
+                                                                          height:
+                                                                              50,
+                                                                        ),
+                                                                        SizedBox(
+                                                                          width:
+                                                                              MediaQuery.of(context).size.width * 0.75,
+                                                                          height:
+                                                                              40.0,
+                                                                          child:
+                                                                              ElevatedButton.icon(
+                                                                            icon:
+                                                                                const Icon(
+                                                                              Icons.save,
+                                                                              color: Colors.white,
                                                                             ),
-                                                                          ),
-                                                                          const SizedBox(
-                                                                            height:
-                                                                                20,
-                                                                          ),
-                                                                          TextFormField(
-                                                                            controller:
-                                                                                _notesController,
-                                                                            maxLines:
-                                                                                1,
-                                                                            decoration:
-                                                                                InputDecoration(
-                                                                              border: OutlineInputBorder(
-                                                                                borderRadius: BorderRadius.circular(15.0),
-                                                                              ),
-                                                                              // hintText: 'Tell us about yourself',
-                                                                              labelText: 'Visiting Fee',
-                                                                              labelStyle: GoogleFonts.abel(),
-                                                                              floatingLabelBehavior: FloatingLabelBehavior.always,
-                                                                              contentPadding: const EdgeInsets.all(5.0),
-                                                                            ),
-                                                                          ),
-                                                                          const SizedBox(
-                                                                            height:
-                                                                                20,
-                                                                          ),
-                                                                          TextFormField(
-                                                                            controller:
-                                                                                _notesController,
-                                                                            maxLines:
-                                                                                1,
-                                                                            decoration:
-                                                                                InputDecoration(
-                                                                              border: OutlineInputBorder(
-                                                                                borderRadius: BorderRadius.circular(15.0),
-                                                                              ),
-                                                                              // hintText: 'Tell us about yourself',
-                                                                              labelText: 'Discount Percentage',
-                                                                              labelStyle: GoogleFonts.abel(),
-                                                                              floatingLabelBehavior: FloatingLabelBehavior.always,
-                                                                              contentPadding: const EdgeInsets.all(5.0),
-                                                                            ),
-                                                                          ),
-                                                                          CheckboxListTile(
-                                                                            title:
+                                                                            label:
                                                                                 Text(
-                                                                              "GST Applicable",
-                                                                              style: GoogleFonts.abel(),
+                                                                              "Save",
+                                                                              style: GoogleFonts.aBeeZee(color: Colors.white),
                                                                             ),
-                                                                            subtitle:
-                                                                                Text(
-                                                                              "10%",
-                                                                              style: GoogleFonts.sourceCodePro(color: Colors.green),
-                                                                            ),
-                                                                            value:
-                                                                                false,
-                                                                            onChanged:
-                                                                                (newValue) {
-                                                                              setState(() {
-                                                                                // checkedValue = newValue;
-                                                                              });
+                                                                            onPressed:
+                                                                                () async {
+                                                                              EasyLoading.show();
+                                                                              EasyLoading.dismiss();
+                                                                              createAnInvoice(
+                                                                                jobId: dataSnapshot.data!.data!.followUps![index].commentsJobId,
+                                                                                followupId: dataSnapshot.data!.data!.followUps![index].followUpsCommentId,
+                                                                              );
+                                                                              Navigator.of(context).pop();
                                                                             },
-                                                                            controlAffinity:
-                                                                                ListTileControlAffinity.leading, //  <-- leading Checkbox
-                                                                          ),
-                                                                          CheckboxListTile(
-                                                                            title:
-                                                                                Text(
-                                                                              "Card Processing Applicable",
-                                                                              style: GoogleFonts.abel(),
-                                                                            ),
-                                                                            subtitle:
-                                                                                Text(
-                                                                              "2.5% fee",
-                                                                              style: GoogleFonts.sourceCodePro(color: Colors.green),
-                                                                            ),
-                                                                            value:
-                                                                                false,
-                                                                            onChanged:
-                                                                                (newValue) {
-                                                                              setState(() {
-                                                                                // checkedValue = newValue;
-                                                                              });
-                                                                            },
-                                                                            controlAffinity:
-                                                                                ListTileControlAffinity.leading, //  <-- leading Checkbox
-                                                                          ),
-                                                                          const SizedBox(
-                                                                            height:
-                                                                                20,
-                                                                          ),
-                                                                          TextFormField(
-                                                                            readOnly:
-                                                                                true,
-                                                                            controller:
-                                                                                _notesController,
-                                                                            maxLines:
-                                                                                1,
-                                                                            decoration:
-                                                                                InputDecoration(
-                                                                              border: OutlineInputBorder(
-                                                                                borderRadius: BorderRadius.circular(15.0),
-                                                                              ),
-                                                                              // hintText: 'Tell us about yourself',
-                                                                              labelText: 'Total Amount',
-                                                                              floatingLabelBehavior: FloatingLabelBehavior.always,
-                                                                              contentPadding: const EdgeInsets.all(5.0),
-                                                                            ),
-                                                                          ),
-                                                                          const SizedBox(
-                                                                            height:
-                                                                                50,
-                                                                          ),
-                                                                          SizedBox(
-                                                                            width:
-                                                                                MediaQuery.of(context).size.width * 0.75,
-                                                                            height:
-                                                                                40.0,
-                                                                            child:
-                                                                                ElevatedButton.icon(
-                                                                              icon: const Icon(
-                                                                                Icons.save,
-                                                                                color: Colors.white,
-                                                                              ),
-                                                                              label: Text(
-                                                                                "Save",
-                                                                                style: GoogleFonts.aBeeZee(color: Colors.white),
-                                                                              ),
-                                                                              onPressed: () async {
-                                                                                EasyLoading.show();
-                                                                                EasyLoading.dismiss();
-
-                                                                                Navigator.of(context).pop();
-                                                                              },
-                                                                              style: ElevatedButton.styleFrom(
-                                                                                backgroundColor: Colors.green,
-                                                                                shape: RoundedRectangleBorder(
-                                                                                  borderRadius: BorderRadius.circular(32.0),
-                                                                                ),
+                                                                            style:
+                                                                                ElevatedButton.styleFrom(
+                                                                              backgroundColor: Colors.green,
+                                                                              shape: RoundedRectangleBorder(
+                                                                                borderRadius: BorderRadius.circular(32.0),
                                                                               ),
                                                                             ),
-                                                                          )
-                                                                        ],
-                                                                      ),
+                                                                          ),
+                                                                        )
+                                                                      ],
                                                                     ),
                                                                   ));
                                                             }));
