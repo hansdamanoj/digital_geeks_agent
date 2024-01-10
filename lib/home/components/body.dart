@@ -821,30 +821,30 @@ class _BodyState extends State<Body> {
                                                           FontWeight.w900)),
                                             ),
                                             Text(
-                                                "${dataSnapshot.data!.data!.followUps![index].salesAddress1}",
+                                                "${dataSnapshot.data!.data!.followUps![index].salesAddress1 ?? ''}",
                                                 style: GoogleFonts.aBeeZee(
                                                     color: Colors.black54)),
                                             Text(
-                                                "${dataSnapshot.data!.data!.followUps![index].salesAddress2}",
+                                                "${dataSnapshot.data!.data!.followUps![index].salesAddress2 ?? ''}",
                                                 style: GoogleFonts.aBeeZee(
                                                     color: Colors.black54)),
                                             Text(
-                                                "${dataSnapshot.data!.data!.followUps![index].salesCity}",
+                                                "${dataSnapshot.data!.data!.followUps![index].salesCity ?? ''}",
                                                 style: GoogleFonts.aBeeZee(
                                                     color: Colors.black54)),
                                             Text(
-                                                "${dataSnapshot.data!.data!.followUps![index].salesState}",
+                                                "${dataSnapshot.data!.data!.followUps![index].salesState ?? ''}",
                                                 style: GoogleFonts.aBeeZee(
                                                     color: Colors.black54)),
                                             Text(
-                                                "${dataSnapshot.data!.data!.followUps![index].salesPinCode}",
+                                                "${dataSnapshot.data!.data!.followUps![index].salesPinCode ?? ''}",
                                                 style: GoogleFonts.aBeeZee(
                                                     color: Colors.black54)),
                                             const SizedBox(
                                               height: 10,
                                             ),
                                             Text(
-                                                "${dataSnapshot.data!.data!.followUps![index].commentsComment}",
+                                                "${dataSnapshot.data!.data!.followUps![index].commentsComment ?? ''}",
                                                 style: GoogleFonts.aBeeZee(
                                                     color: Colors.black54)),
                                             const SizedBox(
@@ -856,12 +856,12 @@ class _BodyState extends State<Body> {
                                                     fontSize: 12,
                                                     color: Colors.black54)),
                                             Text(
-                                                "${dataSnapshot.data!.data!.followUps![index].salesMobile}",
+                                                "${dataSnapshot.data!.data!.followUps![index].salesMobile ?? ''}",
                                                 style: GoogleFonts.changa(
                                                     fontSize: 12,
                                                     color: Colors.black54)),
                                             Text(
-                                                "${dataSnapshot.data!.data!.followUps![index].salesEmail}",
+                                                "${dataSnapshot.data!.data!.followUps![index].salesEmail ?? ''}",
                                                 style: GoogleFonts.changa(
                                                     fontSize: 12,
                                                     color: Colors.black54)),
