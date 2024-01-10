@@ -241,14 +241,7 @@ class _BodyState extends State<Body> {
     EasyLoading.dismiss();
   }
 
-  _saveJobSheet(
-      {job_id,
-      comment_id,
-      comment_notes,
-      status,
-      user_id,
-      video,
-      photo}) async {
+  _saveJobSheet({job_id, comment_id, comment_notes, status, user_id, video, photo}) async {
     try {
       if (photo != null && video != null) {
         final formData = FormData.fromMap({
@@ -391,6 +384,46 @@ class _BodyState extends State<Body> {
     } else {
       EasyLoading.showError("Missing Data");
     }
+  }
+
+  calculateInvoiceTotal(){
+    var total = 0.00;
+    var hourlyServiceCharge = _serviceChargeController.text.isNotEmpty ? double.parse(_serviceChargeController.text) : 0.00;
+    var visitingFee = _visitingFeeController.text.isNotEmpty ? double.parse(_visitingFeeController.text) : 0.00;
+    var hoursSpent = _hoursSpentController.text.isNotEmpty ? double.parse(_hoursSpentController.text) : 0.00;
+    var discount = _discountController.text.isNotEmpty ? double.parse(_discountController.text) / 100 : 0.00;
+
+    print("Total is discount $discount and ${_discountController.text}");
+    if (discount > 0 && discount <= 1) {
+      discount = 1 - discount;
+    } else {
+      discount = 1;
+    }
+    print("Total is discount $discount and ${_discountController.text}");
+
+    total = ((hourlyServiceCharge * hoursSpent) + visitingFee) * discount;
+
+    var gstTotal = _hasTax ? 0.10 : 0;
+    if (_hasTax && (gstTotal > 0 && gstTotal < 1)) {
+      gstTotal = 1 + gstTotal;
+    } else {
+      gstTotal = 1;
+    }
+
+    total = total * gstTotal;
+
+    var cardProcessingTotal = _hasCardProcessing ? 0.025 : 0;
+    if (_hasCardProcessing && (cardProcessingTotal > 0 && cardProcessingTotal < 1)) {
+      cardProcessingTotal = 1 + cardProcessingTotal;
+    } else {
+      cardProcessingTotal = 1;
+    }
+    total = total * cardProcessingTotal;
+
+    setState(() {
+      _totalAmountController.text = total.toString();
+    });
+    print("Total is ${_totalAmountController.text}");
   }
 
   Future<void> _handleRefresh() {
@@ -1339,10 +1372,11 @@ class _BodyState extends State<Body> {
                                                                                 20,
                                                                           ),
                                                                           TextFormField(
-                                                                            controller:
-                                                                                _serviceChargeController,
-                                                                            maxLines:
-                                                                                1,
+                                                                            onChanged: (value){
+                                                                              calculateInvoiceTotal();
+                                                                            },
+                                                                            controller: _serviceChargeController,
+                                                                            maxLines: 1,
                                                                             decoration:
                                                                                 InputDecoration(
                                                                               border: OutlineInputBorder(
@@ -1360,6 +1394,9 @@ class _BodyState extends State<Body> {
                                                                                 20,
                                                                           ),
                                                                           TextFormField(
+                                                                            onChanged: (value){
+                                                                              calculateInvoiceTotal();
+                                                                            },
                                                                             controller:
                                                                                 _hoursSpentController,
                                                                             maxLines:
@@ -1381,6 +1418,9 @@ class _BodyState extends State<Body> {
                                                                                 20,
                                                                           ),
                                                                           TextFormField(
+                                                                            onChanged: (value){
+                                                                              calculateInvoiceTotal();
+                                                                            },
                                                                             controller:
                                                                                 _visitingFeeController,
                                                                             maxLines:
@@ -1402,6 +1442,9 @@ class _BodyState extends State<Body> {
                                                                                 20,
                                                                           ),
                                                                           TextFormField(
+                                                                            onChanged: (value){
+                                                                              calculateInvoiceTotal();
+                                                                            },
                                                                             controller:
                                                                                 _discountController,
                                                                             maxLines:
@@ -1441,6 +1484,7 @@ class _BodyState extends State<Body> {
                                                                                   _hasTax = true;
                                                                                 }
                                                                               });
+                                                                              calculateInvoiceTotal();
                                                                             },
                                                                             controlAffinity:
                                                                                 ListTileControlAffinity.leading, //  <-- leading Checkbox
@@ -1468,6 +1512,7 @@ class _BodyState extends State<Body> {
                                                                                   _hasCardProcessing = true;
                                                                                 }
                                                                               });
+                                                                              calculateInvoiceTotal();
                                                                             },
                                                                             controlAffinity:
                                                                                 ListTileControlAffinity.leading, //  <-- leading Checkbox
@@ -1480,7 +1525,7 @@ class _BodyState extends State<Body> {
                                                                             readOnly:
                                                                                 true,
                                                                             controller:
-                                                                                _notesController,
+                                                                            _totalAmountController,
                                                                             maxLines:
                                                                                 1,
                                                                             decoration:
@@ -2492,6 +2537,9 @@ class _BodyState extends State<Body> {
                                                                               20,
                                                                         ),
                                                                         TextFormField(
+                                                                          onChanged: (value){
+                                                                            calculateInvoiceTotal();
+                                                                          },
                                                                           controller:
                                                                               _serviceChargeController,
                                                                           maxLines:
@@ -2518,6 +2566,9 @@ class _BodyState extends State<Body> {
                                                                               20,
                                                                         ),
                                                                         TextFormField(
+                                                                          onChanged: (value){
+                                                                            calculateInvoiceTotal();
+                                                                          },
                                                                           controller:
                                                                               _hoursSpentController,
                                                                           maxLines:
@@ -2544,6 +2595,9 @@ class _BodyState extends State<Body> {
                                                                               20,
                                                                         ),
                                                                         TextFormField(
+                                                                          onChanged: (value){
+                                                                            calculateInvoiceTotal();
+                                                                          },
                                                                           controller:
                                                                               _visitingFeeController,
                                                                           maxLines:
@@ -2570,6 +2624,9 @@ class _BodyState extends State<Body> {
                                                                               20,
                                                                         ),
                                                                         TextFormField(
+                                                                          onChanged: (value){
+                                                                            calculateInvoiceTotal();
+                                                                          },
                                                                           controller:
                                                                               _discountController,
                                                                           maxLines:
@@ -2616,6 +2673,7 @@ class _BodyState extends State<Body> {
                                                                                 _hasTax = true;
                                                                               }
                                                                             });
+                                                                            calculateInvoiceTotal();
                                                                           },
                                                                           controlAffinity:
                                                                               ListTileControlAffinity.leading, //  <-- leading Checkbox
@@ -2644,8 +2702,8 @@ class _BodyState extends State<Body> {
                                                                               } else {
                                                                                 _hasCardProcessing = true;
                                                                               }
-                                                                              _totalAmountController.text = ((double.parse(_serviceChargeController.text) * double.parse(_hoursSpentController.text) + double.parse(_visitingFeeController.text)) * (1 - double.parse(_discountController.text) / 100)).toString();
                                                                             });
+                                                                            calculateInvoiceTotal();
                                                                           },
                                                                           controlAffinity:
                                                                               ListTileControlAffinity.leading, //  <-- leading Checkbox
