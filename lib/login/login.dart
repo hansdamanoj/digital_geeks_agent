@@ -31,13 +31,15 @@ class _LoginState extends State<Login> {
   void checkLogin() async {
     final SharedPreferences prefs = await SharedPreferences.getInstance();
     if(prefs.getString('user') != null){
-      Navigator.push(
+      if (context.mounted) {
+        Navigator.push(
         context,
         MaterialPageRoute(
             builder: (context) => const HomePage(
               title: 'My Tasks',
             )),
       );
+      }
     }
 
   }

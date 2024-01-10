@@ -1,9 +1,11 @@
 import 'package:auto_size_text/auto_size_text.dart';
 import 'package:digital_geeks_agent/home/components/body.dart';
+import 'package:digital_geeks_agent/login/login.dart';
 import 'package:digital_geeks_agent/shared/StackOfCards.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_easyloading/flutter_easyloading.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key, required this.title});
@@ -55,8 +57,22 @@ class _HomePageState extends State<HomePage> {
           backgroundColor: Theme.of(context).colorScheme.inversePrimary,
           // Here we take the value from the HomePage object that was created by
           // the App.build method, and use it to set our appbar title.
-          title: Text(widget.title),
-          leading: const Icon(Icons.access_time_sharp, color: Colors.white,),
+          title: Text(widget.title, style: GoogleFonts.aboreto(color: Colors.white),),
+          leading: const Icon(Icons.timelapse, color: Colors.white,),
+          actions: [
+            GestureDetector(
+              onTap: () async {
+                //Logout User
+                final SharedPreferences prefs = await SharedPreferences.getInstance();
+                // Remove data for the 'counter' key.
+                await prefs.remove('user');
+                if (context.mounted) Navigator.of(context).push(MaterialPageRoute(builder: (context) => const Login()));
+              },
+                child: const Icon(Icons.power_settings_new_outlined, color: Colors.white,)),
+            const SizedBox(width: 10,),
+            const Icon(Icons.refresh, color: Colors.white,),
+            const SizedBox(width: 10,)
+          ],
           automaticallyImplyLeading: false),
       body: const Body(),
       // floatingActionButton: FloatingActionButton(
