@@ -1548,7 +1548,12 @@ class _BodyState extends State<Body> {
                                                                                     builder: (BuildContext context, AsyncSnapshot invoiceSnapshot) {
                                                                                       switch (invoiceSnapshot.connectionState) {
                                                                                         case ConnectionState.waiting:
-                                                                                          return const Text('Loading....');
+                                                                                          return const Column(
+                                                                                            crossAxisAlignment: CrossAxisAlignment.center,
+                                                                                            children: [
+                                                                                              AutoSizeText("Loading ..."),
+                                                                                            ],
+                                                                                          );
                                                                                         default:
                                                                                           if (invoiceSnapshot.hasError) {
                                                                                             return Text('Error: ${invoiceSnapshot.error}');
@@ -1579,7 +1584,7 @@ class _BodyState extends State<Body> {
                                                                                                                     child: AutoSizeText("Frequency")
                                                                                                                 ),
                                                                                                                 Expanded(
-                                                                                                                    child: AutoSizeText("${invoiceSnapshot.data.data[index].callChargeFrequency ?? 0}")
+                                                                                                                    child: AutoSizeText(StringUtils.capitalize(invoiceSnapshot.data.data[index].callChargeFrequency))
                                                                                                                 ),
                                                                                                               ],
                                                                                                             ),
@@ -1670,7 +1675,7 @@ class _BodyState extends State<Body> {
                                                                             child:
                                                                                 AutoSizeText(
                                                                               "View Invoices",
-                                                                              style: GoogleFonts.abel(fontSize: 30, fontWeight: FontWeight.bold),
+                                                                              style: GoogleFonts.abel(fontSize: 25, fontWeight: FontWeight.bold),
                                                                             ),
                                                                           ),
                                                                         ],
