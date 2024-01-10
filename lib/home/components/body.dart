@@ -362,13 +362,11 @@ class _BodyState extends State<Body> {
       'hours': _hoursSpentController.text,
       'visiting_fee': _visitingFeeController.text,
       'discount': _discountController.text,
-      'gst': _hasTax ? 0.1 * double.parse(_hoursSpentController.text) : 0,
+      'gst': _hasTax ? 10 : 0,
       'card_processing_fee': _hasCardProcessing
-          ? 0.025 * double.parse(_hoursSpentController.text)
+          ? 2.5
           : 0,
-      'total_amount': double.parse(_hoursSpentController.text) +
-          double.parse(_visitingFeeController.text) +
-          double.parse(_discountController.text),
+      'total_amount': double.parse(_totalAmountController.text),
     });
     final Response response = await dio.post(
       'https://crm.mygeeks.net.au/api/v1/add_an_invoice',
@@ -1559,8 +1557,6 @@ class _BodyState extends State<Body> {
                                                                                 style: GoogleFonts.aBeeZee(color: Colors.white),
                                                                               ),
                                                                               onPressed: () async {
-                                                                                EasyLoading.show();
-                                                                                EasyLoading.dismiss();
                                                                                 createAnInvoice(
                                                                                   jobId: dataSnapshot.data!.data!.followUps![index].commentsJobId,
                                                                                   followupId: dataSnapshot.data!.data!.followUps![index].id,
@@ -2761,7 +2757,7 @@ class _BodyState extends State<Body> {
                                                                               EasyLoading.dismiss();
                                                                               createAnInvoice(
                                                                                 jobId: dataSnapshot.data!.data!.followUps![index].commentsJobId,
-                                                                                followupId: dataSnapshot.data!.data!.followUps![index].commentId,
+                                                                                followupId: dataSnapshot.data!.data!.followUps![index].followUpsId,
                                                                               );
                                                                               Navigator.of(context).pop();
                                                                             },
