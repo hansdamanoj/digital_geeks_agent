@@ -1,9 +1,11 @@
 import 'dart:convert';
 import 'dart:io';
 import 'package:auto_size_text/auto_size_text.dart';
+import 'package:digital_geeks_agent/model/AllInvoices.dart';
 import 'package:digital_geeks_agent/model/AllJobSheets.dart';
 import 'package:digital_geeks_agent/model/MyTasks.dart';
 import 'package:dio/dio.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_easyloading/flutter_easyloading.dart';
 import 'package:geocoding/geocoding.dart';
@@ -43,6 +45,7 @@ class _BodyState extends State<Body> {
   bool _hasCardProcessing = false;
   late VideoPlayerController _controller;
   final TextEditingController _notesController = TextEditingController();
+  final TextEditingController _totalAmountController = TextEditingController();
   final TextEditingController _serviceChargeController =
       TextEditingController();
   final TextEditingController _hoursSpentController = TextEditingController();
@@ -76,7 +79,8 @@ class _BodyState extends State<Body> {
       if (response.statusCode == 200) {
         var responseData = json.decode(json.encode(response.data)) as Map;
         print(responseData['data']['followUps'].length);
-        _apiHasDataCount = responseData['data']['followUps'].length + responseData['data']['appointmentsFollowUps'].length;
+        _apiHasDataCount = responseData['data']['followUps'].length +
+            responseData['data']['appointmentsFollowUps'].length;
         EasyLoading.dismiss();
         setState(() {
           _apiHasData = true;
@@ -324,6 +328,36 @@ class _BodyState extends State<Body> {
     }
   }
 
+  Future<AllInvoices?> _getAllInvoices({jobId}) async {
+    // EasyLoading.show();
+    //Call the Api and assign data to future
+    try {
+      final formData = FormData.fromMap({
+        'job_id': jobId,
+      });
+      final Response response = await dio.post(
+        'https://crm.mygeeks.net.au/api/v1/get_all_invoice',
+        data: formData,
+        onSendProgress: (int sent, int total) {
+          print('${sent / total}');
+          EasyLoading.showProgress(sent / total);
+        },
+      );
+      if (response.statusCode == 200) {
+        var responseData = json.decode(json.encode(response.data)) as Map;
+        EasyLoading.dismiss();
+        return AllInvoices.fromJson(response.data);
+      } else {
+        return null;
+      }
+    } catch (e, s) {
+      print(e);
+      print(s);
+      EasyLoading.showInfo("$e");
+    }
+    return null;
+  }
+
   createAnInvoice({followupId, jobId}) async {
     final SharedPreferences prefs = await SharedPreferences.getInstance();
     var user = json.decode(prefs.getString('user')!) as Map;
@@ -395,6 +429,7 @@ class _BodyState extends State<Body> {
     _hoursSpentController.dispose();
     _visitingFeeController.dispose();
     _discountController.dispose();
+    _totalAmountController.dispose();
     super.dispose();
   }
 
@@ -716,10 +751,13 @@ class _BodyState extends State<Body> {
                                                                         );
                                                                       } else {
                                                                         return Column(
-                                                                          crossAxisAlignment: CrossAxisAlignment.center,
+                                                                          crossAxisAlignment:
+                                                                              CrossAxisAlignment.center,
                                                                           children: [
                                                                             AutoSizeText(
-                                                                              "No data", style: GoogleFonts.alumniSansPinstripe(),),
+                                                                              "No data",
+                                                                              style: GoogleFonts.alumniSansPinstripe(),
+                                                                            ),
                                                                           ],
                                                                         );
                                                                       }
@@ -1280,251 +1318,363 @@ class _BodyState extends State<Body> {
                                                                           .height *
                                                                       0.85,
                                                                   child:
-                                                                      Padding(
-                                                                    padding: const EdgeInsets
-                                                                            .all(
-                                                                        15.0),
+                                                                      SingleChildScrollView(
                                                                     child:
-                                                                        Column(
-                                                                      crossAxisAlignment:
-                                                                          CrossAxisAlignment
-                                                                              .center,
-                                                                      children: [
-                                                                        Text(
-                                                                          "Add an Invoice",
-                                                                          style: GoogleFonts.abel(
-                                                                              fontSize: 30,
-                                                                              fontWeight: FontWeight.bold),
-                                                                        ),
-                                                                        const SizedBox(
-                                                                          height:
-                                                                              20,
-                                                                        ),
-                                                                        TextFormField(
-                                                                          controller:
-                                                                              _serviceChargeController,
-                                                                          maxLines:
-                                                                              1,
-                                                                          decoration:
-                                                                              InputDecoration(
-                                                                            border:
-                                                                                OutlineInputBorder(
-                                                                              borderRadius: BorderRadius.circular(15.0),
-                                                                            ),
-                                                                            // hintText: 'Tell us about yourself',
-                                                                            labelText:
-                                                                                'Service Charge',
-                                                                            labelStyle:
-                                                                                GoogleFonts.abel(),
-                                                                            floatingLabelBehavior:
-                                                                                FloatingLabelBehavior.always,
-                                                                            contentPadding:
-                                                                                const EdgeInsets.all(5.0),
-                                                                          ),
-                                                                        ),
-                                                                        const SizedBox(
-                                                                          height:
-                                                                              20,
-                                                                        ),
-                                                                        TextFormField(
-                                                                          controller:
-                                                                              _hoursSpentController,
-                                                                          maxLines:
-                                                                              1,
-                                                                          decoration:
-                                                                              InputDecoration(
-                                                                            border:
-                                                                                OutlineInputBorder(
-                                                                              borderRadius: BorderRadius.circular(15.0),
-                                                                            ),
-                                                                            // hintText: 'Tell us about yourself',
-                                                                            labelText:
-                                                                                'Hours Spent',
-                                                                            labelStyle:
-                                                                                GoogleFonts.abel(),
-                                                                            floatingLabelBehavior:
-                                                                                FloatingLabelBehavior.always,
-                                                                            contentPadding:
-                                                                                const EdgeInsets.all(5.0),
-                                                                          ),
-                                                                        ),
-                                                                        const SizedBox(
-                                                                          height:
-                                                                              20,
-                                                                        ),
-                                                                        TextFormField(
-                                                                          controller:
-                                                                              _visitingFeeController,
-                                                                          maxLines:
-                                                                              1,
-                                                                          decoration:
-                                                                              InputDecoration(
-                                                                            border:
-                                                                                OutlineInputBorder(
-                                                                              borderRadius: BorderRadius.circular(15.0),
-                                                                            ),
-                                                                            // hintText: 'Tell us about yourself',
-                                                                            labelText:
-                                                                                'Visiting Fee',
-                                                                            labelStyle:
-                                                                                GoogleFonts.abel(),
-                                                                            floatingLabelBehavior:
-                                                                                FloatingLabelBehavior.always,
-                                                                            contentPadding:
-                                                                                const EdgeInsets.all(5.0),
-                                                                          ),
-                                                                        ),
-                                                                        const SizedBox(
-                                                                          height:
-                                                                              20,
-                                                                        ),
-                                                                        TextFormField(
-                                                                          controller:
-                                                                              _discountController,
-                                                                          maxLines:
-                                                                              1,
-                                                                          decoration:
-                                                                              InputDecoration(
-                                                                            border:
-                                                                                OutlineInputBorder(
-                                                                              borderRadius: BorderRadius.circular(15.0),
-                                                                            ),
-                                                                            // hintText: 'Tell us about yourself',
-                                                                            labelText:
-                                                                                'Discount Percentage',
-                                                                            labelStyle:
-                                                                                GoogleFonts.abel(),
-                                                                            floatingLabelBehavior:
-                                                                                FloatingLabelBehavior.always,
-                                                                            contentPadding:
-                                                                                const EdgeInsets.all(5.0),
-                                                                          ),
-                                                                        ),
-                                                                        CheckboxListTile(
-                                                                          title:
-                                                                              Text(
-                                                                            "GST Applicable",
+                                                                        Padding(
+                                                                      padding: const EdgeInsets
+                                                                              .all(
+                                                                          15.0),
+                                                                      child:
+                                                                          Column(
+                                                                        crossAxisAlignment:
+                                                                            CrossAxisAlignment.center,
+                                                                        children: [
+                                                                          Text(
+                                                                            "Add an Invoice",
                                                                             style:
-                                                                                GoogleFonts.abel(),
+                                                                                GoogleFonts.abel(fontSize: 30, fontWeight: FontWeight.bold),
                                                                           ),
-                                                                          subtitle:
-                                                                              Text(
-                                                                            "10%",
-                                                                            style:
-                                                                                GoogleFonts.sourceCodePro(color: Colors.green),
+                                                                          const SizedBox(
+                                                                            height:
+                                                                                20,
                                                                           ),
-                                                                          value: _hasTax
-                                                                              ? true
-                                                                              : false,
-                                                                          onChanged:
-                                                                              (newValue) {
-                                                                            setState(() {
-                                                                              if (_hasTax == true) {
-                                                                                _hasTax = false;
-                                                                              } else {
-                                                                                _hasTax = true;
-                                                                              }
-                                                                            });
-                                                                          },
-                                                                          controlAffinity:
-                                                                              ListTileControlAffinity.leading, //  <-- leading Checkbox
-                                                                        ),
-                                                                        CheckboxListTile(
-                                                                          title:
-                                                                              Text(
-                                                                            "Card Processing Applicable",
-                                                                            style:
-                                                                                GoogleFonts.abel(),
-                                                                          ),
-                                                                          subtitle:
-                                                                              Text(
-                                                                            "2.5% fee",
-                                                                            style:
-                                                                                GoogleFonts.sourceCodePro(color: Colors.green),
-                                                                          ),
-                                                                          value: _hasCardProcessing
-                                                                              ? true
-                                                                              : false,
-                                                                          onChanged:
-                                                                              (newValue) {
-                                                                            setState(() {
-                                                                              if (_hasCardProcessing == true) {
-                                                                                _hasCardProcessing = false;
-                                                                              } else {
-                                                                                _hasCardProcessing = true;
-                                                                              }
-                                                                            });
-                                                                          },
-                                                                          controlAffinity:
-                                                                              ListTileControlAffinity.leading, //  <-- leading Checkbox
-                                                                        ),
-                                                                        const SizedBox(
-                                                                          height:
-                                                                              20,
-                                                                        ),
-                                                                        TextFormField(
-                                                                          readOnly:
-                                                                              true,
-                                                                          controller:
-                                                                              _notesController,
-                                                                          maxLines:
-                                                                              1,
-                                                                          decoration:
-                                                                              InputDecoration(
-                                                                            border:
-                                                                                OutlineInputBorder(
-                                                                              borderRadius: BorderRadius.circular(15.0),
+                                                                          TextFormField(
+                                                                            controller:
+                                                                                _serviceChargeController,
+                                                                            maxLines:
+                                                                                1,
+                                                                            decoration:
+                                                                                InputDecoration(
+                                                                              border: OutlineInputBorder(
+                                                                                borderRadius: BorderRadius.circular(15.0),
+                                                                              ),
+                                                                              // hintText: 'Tell us about yourself',
+                                                                              labelText: 'Service Charge',
+                                                                              labelStyle: GoogleFonts.abel(),
+                                                                              floatingLabelBehavior: FloatingLabelBehavior.always,
+                                                                              contentPadding: const EdgeInsets.all(5.0),
                                                                             ),
-                                                                            // hintText: 'Tell us about yourself',
-                                                                            labelText:
-                                                                                'Total Amount',
-                                                                            floatingLabelBehavior:
-                                                                                FloatingLabelBehavior.always,
-                                                                            contentPadding:
-                                                                                const EdgeInsets.all(5.0),
                                                                           ),
-                                                                        ),
-                                                                        const SizedBox(
-                                                                          height:
-                                                                              50,
-                                                                        ),
-                                                                        SizedBox(
-                                                                          width:
-                                                                              MediaQuery.of(context).size.width * 0.75,
-                                                                          height:
-                                                                              40.0,
-                                                                          child:
-                                                                              ElevatedButton.icon(
-                                                                            icon:
-                                                                                const Icon(
-                                                                              Icons.save,
-                                                                              color: Colors.white,
+                                                                          const SizedBox(
+                                                                            height:
+                                                                                20,
+                                                                          ),
+                                                                          TextFormField(
+                                                                            controller:
+                                                                                _hoursSpentController,
+                                                                            maxLines:
+                                                                                1,
+                                                                            decoration:
+                                                                                InputDecoration(
+                                                                              border: OutlineInputBorder(
+                                                                                borderRadius: BorderRadius.circular(15.0),
+                                                                              ),
+                                                                              // hintText: 'Tell us about yourself',
+                                                                              labelText: 'Hours Spent',
+                                                                              labelStyle: GoogleFonts.abel(),
+                                                                              floatingLabelBehavior: FloatingLabelBehavior.always,
+                                                                              contentPadding: const EdgeInsets.all(5.0),
                                                                             ),
-                                                                            label:
+                                                                          ),
+                                                                          const SizedBox(
+                                                                            height:
+                                                                                20,
+                                                                          ),
+                                                                          TextFormField(
+                                                                            controller:
+                                                                                _visitingFeeController,
+                                                                            maxLines:
+                                                                                1,
+                                                                            decoration:
+                                                                                InputDecoration(
+                                                                              border: OutlineInputBorder(
+                                                                                borderRadius: BorderRadius.circular(15.0),
+                                                                              ),
+                                                                              // hintText: 'Tell us about yourself',
+                                                                              labelText: 'Visiting Fee',
+                                                                              labelStyle: GoogleFonts.abel(),
+                                                                              floatingLabelBehavior: FloatingLabelBehavior.always,
+                                                                              contentPadding: const EdgeInsets.all(5.0),
+                                                                            ),
+                                                                          ),
+                                                                          const SizedBox(
+                                                                            height:
+                                                                                20,
+                                                                          ),
+                                                                          TextFormField(
+                                                                            controller:
+                                                                                _discountController,
+                                                                            maxLines:
+                                                                                1,
+                                                                            decoration:
+                                                                                InputDecoration(
+                                                                              border: OutlineInputBorder(
+                                                                                borderRadius: BorderRadius.circular(15.0),
+                                                                              ),
+                                                                              // hintText: 'Tell us about yourself',
+                                                                              labelText: 'Discount Percentage',
+                                                                              labelStyle: GoogleFonts.abel(),
+                                                                              floatingLabelBehavior: FloatingLabelBehavior.always,
+                                                                              contentPadding: const EdgeInsets.all(5.0),
+                                                                            ),
+                                                                          ),
+                                                                          CheckboxListTile(
+                                                                            title:
                                                                                 Text(
-                                                                              "Save",
-                                                                              style: GoogleFonts.aBeeZee(color: Colors.white),
+                                                                              "GST Applicable",
+                                                                              style: GoogleFonts.abel(),
                                                                             ),
-                                                                            onPressed:
-                                                                                () async {
-                                                                              EasyLoading.show();
-                                                                              EasyLoading.dismiss();
-                                                                              createAnInvoice(
-                                                                                jobId: dataSnapshot.data!.data!.followUps![index].commentsJobId,
-                                                                                followupId: dataSnapshot.data!.data!.followUps![index].id,
-                                                                              );
-                                                                              Navigator.of(context).pop();
+                                                                            subtitle:
+                                                                                Text(
+                                                                              "10%",
+                                                                              style: GoogleFonts.sourceCodePro(color: Colors.green),
+                                                                            ),
+                                                                            value: _hasTax
+                                                                                ? true
+                                                                                : false,
+                                                                            onChanged:
+                                                                                (newValue) {
+                                                                              setState(() {
+                                                                                if (_hasTax == true) {
+                                                                                  _hasTax = false;
+                                                                                } else {
+                                                                                  _hasTax = true;
+                                                                                }
+                                                                              });
                                                                             },
-                                                                            style:
-                                                                                ElevatedButton.styleFrom(
-                                                                              backgroundColor: Colors.green,
-                                                                              shape: RoundedRectangleBorder(
-                                                                                borderRadius: BorderRadius.circular(32.0),
+                                                                            controlAffinity:
+                                                                                ListTileControlAffinity.leading, //  <-- leading Checkbox
+                                                                          ),
+                                                                          CheckboxListTile(
+                                                                            title:
+                                                                                Text(
+                                                                              "Card Processing Applicable",
+                                                                              style: GoogleFonts.abel(),
+                                                                            ),
+                                                                            subtitle:
+                                                                                Text(
+                                                                              "2.5% fee",
+                                                                              style: GoogleFonts.sourceCodePro(color: Colors.green),
+                                                                            ),
+                                                                            value: _hasCardProcessing
+                                                                                ? true
+                                                                                : false,
+                                                                            onChanged:
+                                                                                (newValue) {
+                                                                              setState(() {
+                                                                                if (_hasCardProcessing == true) {
+                                                                                  _hasCardProcessing = false;
+                                                                                } else {
+                                                                                  _hasCardProcessing = true;
+                                                                                }
+                                                                              });
+                                                                            },
+                                                                            controlAffinity:
+                                                                                ListTileControlAffinity.leading, //  <-- leading Checkbox
+                                                                          ),
+                                                                          const SizedBox(
+                                                                            height:
+                                                                                20,
+                                                                          ),
+                                                                          TextFormField(
+                                                                            readOnly:
+                                                                                true,
+                                                                            controller:
+                                                                                _notesController,
+                                                                            maxLines:
+                                                                                1,
+                                                                            decoration:
+                                                                                InputDecoration(
+                                                                              border: OutlineInputBorder(
+                                                                                borderRadius: BorderRadius.circular(15.0),
+                                                                              ),
+                                                                              // hintText: 'Tell us about yourself',
+                                                                              labelText: 'Total Amount',
+                                                                              floatingLabelBehavior: FloatingLabelBehavior.always,
+                                                                              contentPadding: const EdgeInsets.all(5.0),
+                                                                            ),
+                                                                          ),
+                                                                          const SizedBox(
+                                                                            height:
+                                                                                50,
+                                                                          ),
+                                                                          SizedBox(
+                                                                            width:
+                                                                                MediaQuery.of(context).size.width * 0.75,
+                                                                            height:
+                                                                                40.0,
+                                                                            child:
+                                                                                ElevatedButton.icon(
+                                                                              icon: const Icon(
+                                                                                Icons.save,
+                                                                                color: Colors.white,
+                                                                              ),
+                                                                              label: Text(
+                                                                                "Save",
+                                                                                style: GoogleFonts.aBeeZee(color: Colors.white),
+                                                                              ),
+                                                                              onPressed: () async {
+                                                                                EasyLoading.show();
+                                                                                EasyLoading.dismiss();
+                                                                                createAnInvoice(
+                                                                                  jobId: dataSnapshot.data!.data!.followUps![index].commentsJobId,
+                                                                                  followupId: dataSnapshot.data!.data!.followUps![index].id,
+                                                                                );
+                                                                                Navigator.of(context).pop();
+                                                                              },
+                                                                              style: ElevatedButton.styleFrom(
+                                                                                backgroundColor: Colors.green,
+                                                                                shape: RoundedRectangleBorder(
+                                                                                  borderRadius: BorderRadius.circular(32.0),
+                                                                                ),
                                                                               ),
                                                                             ),
                                                                           ),
-                                                                        )
-                                                                      ],
+                                                                          const SizedBox(
+                                                                            height:
+                                                                                50,
+                                                                          ),
+                                                                          GestureDetector(
+                                                                            onTap:
+                                                                                () {
+                                                                              showCupertinoModalBottomSheet(
+                                                                                expand: true,
+                                                                                isDismissible: false,
+                                                                                context: context,
+                                                                                backgroundColor: Colors.white,
+                                                                                builder: (context) => SafeArea(
+                                                                                  child: FutureBuilder<AllInvoices?>(
+                                                                                    future: _getAllInvoices(jobId: 24), // async work
+                                                                                    builder: (BuildContext context, AsyncSnapshot invoiceSnapshot) {
+                                                                                      switch (invoiceSnapshot.connectionState) {
+                                                                                        case ConnectionState.waiting:
+                                                                                          return const Text('Loading....');
+                                                                                        default:
+                                                                                          if (invoiceSnapshot.hasError) {
+                                                                                            return Text('Error: ${invoiceSnapshot.error}');
+                                                                                          } else {
+                                                                                            return ListView.builder(
+                                                                                                itemCount: invoiceSnapshot.data!.data?.length,
+                                                                                                itemBuilder: (context, index) => Padding(
+                                                                                                    padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 10),
+                                                                                                    child: Card(
+                                                                                                      child: Padding(
+                                                                                                        padding: const EdgeInsets.all(15.0),
+                                                                                                        child: Column(
+                                                                                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                                                                                          children: [
+                                                                                                            Row(
+                                                                                                              children: [
+                                                                                                                const Expanded(
+                                                                                                                    child: AutoSizeText("Invoice Number")
+                                                                                                                ),
+                                                                                                                Expanded(
+                                                                                                                    child: AutoSizeText("${invoiceSnapshot.data.data[index].id}", style: GoogleFonts.abyssinicaSil(fontSize: 20),),
+                                                                                                                ),
+                                                                                                              ],
+                                                                                                            ),
+                                                                                                            Row(
+                                                                                                              children: [
+                                                                                                                const Expanded(
+                                                                                                                    child: AutoSizeText("Frequency")
+                                                                                                                ),
+                                                                                                                Expanded(
+                                                                                                                    child: AutoSizeText("${invoiceSnapshot.data.data[index].callChargeFrequency ?? 0}")
+                                                                                                                ),
+                                                                                                              ],
+                                                                                                            ),
+                                                                                                            Row(
+                                                                                                              children: [
+                                                                                                                const Expanded(
+                                                                                                                    child: AutoSizeText("Service Charge")
+                                                                                                                ),
+                                                                                                                Expanded(
+                                                                                                                    child: AutoSizeText("${invoiceSnapshot.data.data[index].hourlyServiceCharge ?? 0}"),
+                                                                                                                ),
+                                                                                                              ],
+                                                                                                            ),
+                                                                                                            Row(
+                                                                                                              children: [
+                                                                                                                const Expanded(
+                                                                                                                    child: AutoSizeText("Hours")
+                                                                                                                ),
+                                                                                                                Expanded(
+                                                                                                                  child: AutoSizeText("${invoiceSnapshot.data.data[index].hours ?? 0}"),
+                                                                                                                ),
+                                                                                                              ],
+                                                                                                            ),
+                                                                                                            Row(
+                                                                                                              children: [
+                                                                                                                const Expanded(
+                                                                                                                    child: AutoSizeText("Visiting Fee ")
+                                                                                                                ),
+                                                                                                                Expanded(
+                                                                                                                  child: AutoSizeText("${invoiceSnapshot.data.data[index].visitingFee ?? 0}"),
+                                                                                                                ),
+                                                                                                              ],
+                                                                                                            ),
+                                                                                                            Row(
+                                                                                                              children: [
+                                                                                                                const Expanded(
+                                                                                                                    child: AutoSizeText("Discount")
+                                                                                                                ),
+                                                                                                                Expanded(
+                                                                                                                  child: AutoSizeText("${invoiceSnapshot.data.data[index].discount ?? 0} %"),
+                                                                                                                ),
+                                                                                                              ],
+                                                                                                            ),
+                                                                                                            Row(
+                                                                                                              children: [
+                                                                                                                const Expanded(
+                                                                                                                    child: AutoSizeText("GST")
+                                                                                                                ),
+                                                                                                                Expanded(
+                                                                                                                  child: AutoSizeText("${invoiceSnapshot.data.data[index].gst ?? 0} %"),
+                                                                                                                ),
+                                                                                                              ],
+                                                                                                            ),
+                                                                                                            Row(
+                                                                                                              children: [
+                                                                                                                const Expanded(
+                                                                                                                    child: AutoSizeText("Card Processing Fee")
+                                                                                                                ),
+                                                                                                                Expanded(
+                                                                                                                  child: AutoSizeText("${invoiceSnapshot.data.data[index].cardProcessingFee ?? 0} %"),
+                                                                                                                ),
+                                                                                                              ],
+                                                                                                            ),
+                                                                                                            Row(
+                                                                                                              children: [
+                                                                                                                Expanded(
+                                                                                                                    child: AutoSizeText("Total Amount", style: GoogleFonts.abyssinicaSil(fontSize: 20),)
+                                                                                                                ),
+                                                                                                                Expanded(
+                                                                                                                  child: AutoSizeText("${invoiceSnapshot.data.data[index].totalAmount}", style: GoogleFonts.abyssinicaSil(fontSize: 20),),
+                                                                                                                ),
+                                                                                                              ],
+                                                                                                            ),
+
+
+
+                                                                                                          ],
+                                                                                                        ),
+                                                                                                      ),
+                                                                                                    )));
+                                                                                          }
+                                                                                      }
+                                                                                    },
+                                                                                  ),
+                                                                                ),
+                                                                              );
+                                                                            },
+                                                                            child:
+                                                                                AutoSizeText(
+                                                                              "View Invoices",
+                                                                              style: GoogleFonts.abel(fontSize: 30, fontWeight: FontWeight.bold),
+                                                                            ),
+                                                                          ),
+                                                                        ],
+                                                                      ),
                                                                     ),
                                                                   ));
                                                             }));
@@ -1754,10 +1904,13 @@ class _BodyState extends State<Body> {
                                                                         );
                                                                       } else {
                                                                         return Column(
-                                                                          crossAxisAlignment: CrossAxisAlignment.center,
+                                                                          crossAxisAlignment:
+                                                                              CrossAxisAlignment.center,
                                                                           children: [
                                                                             AutoSizeText(
-                                                                                "No data", style: GoogleFonts.alumniSansPinstripe(),),
+                                                                              "No data",
+                                                                              style: GoogleFonts.alumniSansPinstripe(),
+                                                                            ),
                                                                           ],
                                                                         );
                                                                       }
@@ -2486,6 +2639,7 @@ class _BodyState extends State<Body> {
                                                                               } else {
                                                                                 _hasCardProcessing = true;
                                                                               }
+                                                                              _totalAmountController.text = ((double.parse(_serviceChargeController.text) * double.parse(_hoursSpentController.text) + double.parse(_visitingFeeController.text)) * (1 - double.parse(_discountController.text) / 100)).toString();
                                                                             });
                                                                           },
                                                                           controlAffinity:
@@ -2499,7 +2653,7 @@ class _BodyState extends State<Body> {
                                                                           readOnly:
                                                                               true,
                                                                           controller:
-                                                                              _notesController,
+                                                                              _totalAmountController,
                                                                           maxLines:
                                                                               1,
                                                                           decoration:
@@ -2544,7 +2698,7 @@ class _BodyState extends State<Body> {
                                                                               EasyLoading.dismiss();
                                                                               createAnInvoice(
                                                                                 jobId: dataSnapshot.data!.data!.followUps![index].commentsJobId,
-                                                                                followupId: dataSnapshot.data!.data!.followUps![index].followUpsCommentId,
+                                                                                followupId: dataSnapshot.data!.data!.followUps![index].commentId,
                                                                               );
                                                                               Navigator.of(context).pop();
                                                                             },
