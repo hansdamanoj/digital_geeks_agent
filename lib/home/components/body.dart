@@ -245,7 +245,14 @@ class _BodyState extends State<Body> {
     EasyLoading.dismiss();
   }
 
-  _saveJobSheet({job_id, comment_id, comment_notes, status, user_id, video, photo}) async {
+  _saveJobSheet(
+      {job_id,
+      comment_id,
+      comment_notes,
+      status,
+      user_id,
+      video,
+      photo}) async {
     try {
       if (photo != null && video != null) {
         final formData = FormData.fromMap({
@@ -369,9 +376,7 @@ class _BodyState extends State<Body> {
       'visiting_fee': _visitingFeeController.text,
       'discount': _discountController.text,
       'gst': _hasTax ? 10 : 0,
-      'card_processing_fee': _hasCardProcessing
-          ? 2.5
-          : 0,
+      'card_processing_fee': _hasCardProcessing ? 2.5 : 0,
       'total_amount': _totalAmountController.text,
     });
     final Response response = await dio.post(
@@ -400,12 +405,20 @@ class _BodyState extends State<Body> {
     }
   }
 
-  calculateInvoiceTotal(){
+  calculateInvoiceTotal() {
     var total = 0.00;
-    var hourlyServiceCharge = _serviceChargeController.text.isNotEmpty ? double.parse(_serviceChargeController.text) : 0.00;
-    var visitingFee = _visitingFeeController.text.isNotEmpty ? double.parse(_visitingFeeController.text) : 0.00;
-    var hoursSpent = _hoursSpentController.text.isNotEmpty ? double.parse(_hoursSpentController.text) : 0.00;
-    var discount = _discountController.text.isNotEmpty ? double.parse(_discountController.text) / 100 : 0.00;
+    var hourlyServiceCharge = _serviceChargeController.text.isNotEmpty
+        ? double.parse(_serviceChargeController.text)
+        : 0.00;
+    var visitingFee = _visitingFeeController.text.isNotEmpty
+        ? double.parse(_visitingFeeController.text)
+        : 0.00;
+    var hoursSpent = _hoursSpentController.text.isNotEmpty
+        ? double.parse(_hoursSpentController.text)
+        : 0.00;
+    var discount = _discountController.text.isNotEmpty
+        ? double.parse(_discountController.text) / 100
+        : 0.00;
 
     print("Total is discount $discount and ${_discountController.text}");
     if (discount > 0 && discount <= 1) {
@@ -427,7 +440,8 @@ class _BodyState extends State<Body> {
     total = total * gstTotal;
 
     var cardProcessingTotal = _hasCardProcessing ? 0.025 : 0;
-    if (_hasCardProcessing && (cardProcessingTotal > 0 && cardProcessingTotal < 1)) {
+    if (_hasCardProcessing &&
+        (cardProcessingTotal > 0 && cardProcessingTotal < 1)) {
       cardProcessingTotal = 1 + cardProcessingTotal;
     } else {
       cardProcessingTotal = 1;
@@ -869,7 +883,14 @@ class _BodyState extends State<Body> {
                                         )),
                                     dataSnapshot.data!.data!.followUps![index]
                                                 .status ==
-                                            'inprogress'
+                                            'inprogress' ||
+                                        dataSnapshot
+                                            .data!
+                                            .data!
+                                            .followUps![
+                                        index]
+                                            .status ==
+                                            'pending'
                                         ? Expanded(
                                             flex: 1,
                                             child: Column(
@@ -1381,24 +1402,31 @@ class _BodyState extends State<Body> {
                                                                             style:
                                                                                 GoogleFonts.abel(fontSize: 30, fontWeight: FontWeight.bold),
                                                                           ),
-                                                                          DropdownButton<String>(
+                                                                          DropdownButton<
+                                                                              String>(
                                                                             // isExpanded: true,
-                                                                            value: _serviceFrequencyValue,
-                                                                            icon: const Icon(Icons.arrow_downward),
-                                                                            elevation: 16,
-                                                                            style: const TextStyle(color: Colors.deepPurple),
-                                                                            underline: Container(
+                                                                            value:
+                                                                                _serviceFrequencyValue,
+                                                                            icon:
+                                                                                const Icon(Icons.arrow_downward),
+                                                                            elevation:
+                                                                                16,
+                                                                            style:
+                                                                                const TextStyle(color: Colors.deepPurple),
+                                                                            underline:
+                                                                                Container(
                                                                               height: 2,
                                                                               color: Colors.deepPurpleAccent,
                                                                             ),
-                                                                            onChanged: (String? value) {
+                                                                            onChanged:
+                                                                                (String? value) {
                                                                               // This is called when the user selects an item.
-                                                                              if(value == 'Unit'){
-                                                                                setState((){
+                                                                              if (value == 'Unit') {
+                                                                                setState(() {
                                                                                   _hideHours = true;
                                                                                 });
-                                                                              }else{
-                                                                                setState((){
+                                                                              } else {
+                                                                                setState(() {
                                                                                   _hideHours = false;
                                                                                 });
                                                                               }
@@ -1407,7 +1435,8 @@ class _BodyState extends State<Body> {
                                                                                 _hoursSpentController.text = '0';
                                                                               });
                                                                             },
-                                                                            items: _serviceFrequency.map<DropdownMenuItem<String>>((String value) {
+                                                                            items:
+                                                                                _serviceFrequency.map<DropdownMenuItem<String>>((String value) {
                                                                               return DropdownMenuItem<String>(
                                                                                 value: value,
                                                                                 child: Text(value),
@@ -1419,11 +1448,14 @@ class _BodyState extends State<Body> {
                                                                                 20,
                                                                           ),
                                                                           TextFormField(
-                                                                            onChanged: (value){
+                                                                            onChanged:
+                                                                                (value) {
                                                                               calculateInvoiceTotal();
                                                                             },
-                                                                            controller: _serviceChargeController,
-                                                                            maxLines: 1,
+                                                                            controller:
+                                                                                _serviceChargeController,
+                                                                            maxLines:
+                                                                                1,
                                                                             decoration:
                                                                                 InputDecoration(
                                                                               border: OutlineInputBorder(
@@ -1436,36 +1468,37 @@ class _BodyState extends State<Body> {
                                                                               contentPadding: const EdgeInsets.all(5.0),
                                                                             ),
                                                                           ),
-                                                                          !_hideHours ? const SizedBox(
-                                                                            height:
-                                                                                20,
-                                                                          ) : Container(),
-                                                                          !_hideHours ? TextFormField(
-                                                                            onChanged: (value){
-                                                                              calculateInvoiceTotal();
-                                                                            },
-                                                                            controller:
-                                                                                _hoursSpentController,
-                                                                            maxLines:
-                                                                                1,
-                                                                            decoration:
-                                                                                InputDecoration(
-                                                                              border: OutlineInputBorder(
-                                                                                borderRadius: BorderRadius.circular(15.0),
-                                                                              ),
-                                                                              // hintText: 'Tell us about yourself',
-                                                                              labelText: 'Hours Spent',
-                                                                              labelStyle: GoogleFonts.abel(),
-                                                                              floatingLabelBehavior: FloatingLabelBehavior.always,
-                                                                              contentPadding: const EdgeInsets.all(5.0),
-                                                                            ),
-                                                                          ) : Container(),
+                                                                          !_hideHours
+                                                                              ? const SizedBox(
+                                                                                  height: 20,
+                                                                                )
+                                                                              : Container(),
+                                                                          !_hideHours
+                                                                              ? TextFormField(
+                                                                                  onChanged: (value) {
+                                                                                    calculateInvoiceTotal();
+                                                                                  },
+                                                                                  controller: _hoursSpentController,
+                                                                                  maxLines: 1,
+                                                                                  decoration: InputDecoration(
+                                                                                    border: OutlineInputBorder(
+                                                                                      borderRadius: BorderRadius.circular(15.0),
+                                                                                    ),
+                                                                                    // hintText: 'Tell us about yourself',
+                                                                                    labelText: 'Hours Spent',
+                                                                                    labelStyle: GoogleFonts.abel(),
+                                                                                    floatingLabelBehavior: FloatingLabelBehavior.always,
+                                                                                    contentPadding: const EdgeInsets.all(5.0),
+                                                                                  ),
+                                                                                )
+                                                                              : Container(),
                                                                           const SizedBox(
                                                                             height:
                                                                                 20,
                                                                           ),
                                                                           TextFormField(
-                                                                            onChanged: (value){
+                                                                            onChanged:
+                                                                                (value) {
                                                                               calculateInvoiceTotal();
                                                                             },
                                                                             controller:
@@ -1489,7 +1522,8 @@ class _BodyState extends State<Body> {
                                                                                 20,
                                                                           ),
                                                                           TextFormField(
-                                                                            onChanged: (value){
+                                                                            onChanged:
+                                                                                (value) {
                                                                               calculateInvoiceTotal();
                                                                             },
                                                                             controller:
@@ -1572,7 +1606,7 @@ class _BodyState extends State<Body> {
                                                                             readOnly:
                                                                                 true,
                                                                             controller:
-                                                                            _totalAmountController,
+                                                                                _totalAmountController,
                                                                             maxLines:
                                                                                 1,
                                                                             decoration:
@@ -1657,43 +1691,36 @@ class _BodyState extends State<Body> {
                                                                                                       child: Padding(
                                                                                                         padding: const EdgeInsets.all(15.0),
                                                                                                         child: Column(
-                                                                                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                                                                                          crossAxisAlignment: CrossAxisAlignment.start,
                                                                                                           children: [
                                                                                                             Row(
                                                                                                               children: [
-                                                                                                                const Expanded(
-                                                                                                                    child: AutoSizeText("Invoice Number")
-                                                                                                                ),
+                                                                                                                const Expanded(child: AutoSizeText("Invoice Number")),
                                                                                                                 Expanded(
-                                                                                                                    child: AutoSizeText("${invoiceSnapshot.data.data[index].id}", style: GoogleFonts.abyssinicaSil(fontSize: 20),),
+                                                                                                                  child: AutoSizeText(
+                                                                                                                    "${invoiceSnapshot.data.data[index].id}",
+                                                                                                                    style: GoogleFonts.abyssinicaSil(fontSize: 20),
+                                                                                                                  ),
                                                                                                                 ),
                                                                                                               ],
                                                                                                             ),
                                                                                                             Row(
                                                                                                               children: [
-                                                                                                                const Expanded(
-                                                                                                                    child: AutoSizeText("Frequency")
-                                                                                                                ),
+                                                                                                                const Expanded(child: AutoSizeText("Frequency")),
+                                                                                                                Expanded(child: AutoSizeText(invoiceSnapshot.data.data[index].callChargeFrequency != null ? StringUtils.capitalize(invoiceSnapshot.data.data[index].callChargeFrequency) : '-')),
+                                                                                                              ],
+                                                                                                            ),
+                                                                                                            Row(
+                                                                                                              children: [
+                                                                                                                const Expanded(child: AutoSizeText("Service Charge")),
                                                                                                                 Expanded(
-                                                                                                                    child: AutoSizeText(invoiceSnapshot.data.data[index].callChargeFrequency != null ? StringUtils.capitalize(invoiceSnapshot.data.data[index].callChargeFrequency) : '-')
+                                                                                                                  child: AutoSizeText("${invoiceSnapshot.data.data[index].hourlyServiceCharge ?? 0}"),
                                                                                                                 ),
                                                                                                               ],
                                                                                                             ),
                                                                                                             Row(
                                                                                                               children: [
-                                                                                                                const Expanded(
-                                                                                                                    child: AutoSizeText("Service Charge")
-                                                                                                                ),
-                                                                                                                Expanded(
-                                                                                                                    child: AutoSizeText("${invoiceSnapshot.data.data[index].hourlyServiceCharge ?? 0}"),
-                                                                                                                ),
-                                                                                                              ],
-                                                                                                            ),
-                                                                                                            Row(
-                                                                                                              children: [
-                                                                                                                const Expanded(
-                                                                                                                    child: AutoSizeText("Hours")
-                                                                                                                ),
+                                                                                                                const Expanded(child: AutoSizeText("Hours")),
                                                                                                                 Expanded(
                                                                                                                   child: AutoSizeText("${invoiceSnapshot.data.data[index].hours ?? 0}"),
                                                                                                                 ),
@@ -1701,9 +1728,7 @@ class _BodyState extends State<Body> {
                                                                                                             ),
                                                                                                             Row(
                                                                                                               children: [
-                                                                                                                const Expanded(
-                                                                                                                    child: AutoSizeText("Visiting Fee ")
-                                                                                                                ),
+                                                                                                                const Expanded(child: AutoSizeText("Visiting Fee ")),
                                                                                                                 Expanded(
                                                                                                                   child: AutoSizeText("${invoiceSnapshot.data.data[index].visitingFee ?? 0}"),
                                                                                                                 ),
@@ -1711,9 +1736,7 @@ class _BodyState extends State<Body> {
                                                                                                             ),
                                                                                                             Row(
                                                                                                               children: [
-                                                                                                                const Expanded(
-                                                                                                                    child: AutoSizeText("Discount")
-                                                                                                                ),
+                                                                                                                const Expanded(child: AutoSizeText("Discount")),
                                                                                                                 Expanded(
                                                                                                                   child: AutoSizeText("${invoiceSnapshot.data.data[index].discount ?? 0} %"),
                                                                                                                 ),
@@ -1721,9 +1744,7 @@ class _BodyState extends State<Body> {
                                                                                                             ),
                                                                                                             Row(
                                                                                                               children: [
-                                                                                                                const Expanded(
-                                                                                                                    child: AutoSizeText("GST")
-                                                                                                                ),
+                                                                                                                const Expanded(child: AutoSizeText("GST")),
                                                                                                                 Expanded(
                                                                                                                   child: AutoSizeText("${invoiceSnapshot.data.data[index].gst ?? 0} %"),
                                                                                                                 ),
@@ -1731,9 +1752,7 @@ class _BodyState extends State<Body> {
                                                                                                             ),
                                                                                                             Row(
                                                                                                               children: [
-                                                                                                                const Expanded(
-                                                                                                                    child: AutoSizeText("Card Processing Fee")
-                                                                                                                ),
+                                                                                                                const Expanded(child: AutoSizeText("Card Processing Fee")),
                                                                                                                 Expanded(
                                                                                                                   child: AutoSizeText("${invoiceSnapshot.data.data[index].cardProcessingFee ?? 0} %"),
                                                                                                                 ),
@@ -1742,16 +1761,18 @@ class _BodyState extends State<Body> {
                                                                                                             Row(
                                                                                                               children: [
                                                                                                                 Expanded(
-                                                                                                                    child: AutoSizeText("Total Amount", style: GoogleFonts.abyssinicaSil(fontSize: 20),)
-                                                                                                                ),
+                                                                                                                    child: AutoSizeText(
+                                                                                                                  "Total Amount",
+                                                                                                                  style: GoogleFonts.abyssinicaSil(fontSize: 20),
+                                                                                                                )),
                                                                                                                 Expanded(
-                                                                                                                  child: AutoSizeText("${invoiceSnapshot.data.data[index].totalAmount ?? 0}", style: GoogleFonts.abyssinicaSil(fontSize: 20),),
+                                                                                                                  child: AutoSizeText(
+                                                                                                                    "${invoiceSnapshot.data.data[index].totalAmount ?? 0}",
+                                                                                                                    style: GoogleFonts.abyssinicaSil(fontSize: 20),
+                                                                                                                  ),
                                                                                                                 ),
                                                                                                               ],
                                                                                                             ),
-
-
-
                                                                                                           ],
                                                                                                         ),
                                                                                                       ),
@@ -2023,30 +2044,30 @@ class _BodyState extends State<Body> {
                                                           FontWeight.w900)),
                                             ),
                                             AutoSizeText(
-                                                "${dataSnapshot.data!.data!.appointmentsFollowUps![index].appointmentsAddress1}",
+                                                "${dataSnapshot.data!.data!.appointmentsFollowUps![index].appointmentsAddress1 ?? ''}",
                                                 style: GoogleFonts.aBeeZee(
                                                     color: Colors.black54)),
                                             AutoSizeText(
-                                                "${dataSnapshot.data!.data!.appointmentsFollowUps![index].appointmentsAddress2}",
+                                                "${dataSnapshot.data!.data!.appointmentsFollowUps![index].appointmentsAddress2 ?? ''}",
                                                 style: GoogleFonts.aBeeZee(
                                                     color: Colors.black54)),
                                             AutoSizeText(
-                                                "${dataSnapshot.data!.data!.appointmentsFollowUps![index].appointmentsCity}",
+                                                "${dataSnapshot.data!.data!.appointmentsFollowUps![index].appointmentsCity ?? ''}",
                                                 style: GoogleFonts.aBeeZee(
                                                     color: Colors.black54)),
                                             AutoSizeText(
-                                                "${dataSnapshot.data!.data!.appointmentsFollowUps![index].appointmentsState}",
+                                                "${dataSnapshot.data!.data!.appointmentsFollowUps![index].appointmentsState ?? ''}",
                                                 style: GoogleFonts.aBeeZee(
                                                     color: Colors.black54)),
                                             AutoSizeText(
-                                                "${dataSnapshot.data!.data!.appointmentsFollowUps![index].appointmentsPinCode}",
+                                                "${dataSnapshot.data!.data!.appointmentsFollowUps![index].appointmentsPinCode ?? ''}",
                                                 style: GoogleFonts.aBeeZee(
                                                     color: Colors.black54)),
                                             const SizedBox(
                                               height: 10,
                                             ),
                                             AutoSizeText(
-                                                "${dataSnapshot.data!.data!.appointmentsFollowUps![index].commentsComment}",
+                                                "${dataSnapshot.data!.data!.appointmentsFollowUps![index].commentsComment ?? ''}",
                                                 style: GoogleFonts.aBeeZee(
                                                     color: Colors.black54)),
                                             const SizedBox(
@@ -2058,23 +2079,31 @@ class _BodyState extends State<Body> {
                                                     fontSize: 12,
                                                     color: Colors.black54)),
                                             AutoSizeText(
-                                                "${dataSnapshot.data!.data!.appointmentsFollowUps![index].appointmentsMobile}",
+                                                "${dataSnapshot.data!.data!.appointmentsFollowUps![index].appointmentsMobile ?? ''}",
                                                 style: GoogleFonts.changa(
                                                     fontSize: 12,
                                                     color: Colors.black54)),
                                             AutoSizeText(
-                                                "${dataSnapshot.data!.data!.appointmentsFollowUps![index].appointmentsEmail}",
+                                                "${dataSnapshot.data!.data!.appointmentsFollowUps![index].appointmentsEmail ?? ''}",
                                                 style: GoogleFonts.changa(
                                                     fontSize: 12,
                                                     color: Colors.black54)),
                                           ],
                                         )),
                                     dataSnapshot
-                                                .data!
-                                                .data!
-                                                .appointmentsFollowUps![index]
-                                                .followUpsStatus ==
-                                            'inprogress'
+                                                    .data!
+                                                    .data!
+                                                    .appointmentsFollowUps![
+                                                        index]
+                                                    .followUpsStatus ==
+                                                'inprogress' ||
+                                            dataSnapshot
+                                                    .data!
+                                                    .data!
+                                                    .appointmentsFollowUps![
+                                                        index]
+                                                    .followUpsStatus ==
+                                                'pending'
                                         ? Expanded(
                                             flex: 1,
                                             child: Column(
@@ -2563,44 +2592,50 @@ class _BodyState extends State<Body> {
                                                                       0.85,
                                                                   child:
                                                                       SingleChildScrollView(
-                                                                        child: Padding(
-                                                                    padding: const EdgeInsets
+                                                                    child:
+                                                                        Padding(
+                                                                      padding: const EdgeInsets
                                                                               .all(
                                                                           15.0),
-                                                                    child:
+                                                                      child:
                                                                           Column(
                                                                         crossAxisAlignment:
-                                                                            CrossAxisAlignment
-                                                                                .center,
+                                                                            CrossAxisAlignment.center,
                                                                         children: [
                                                                           Text(
                                                                             "Add an Invoice",
-                                                                            style: GoogleFonts.abel(
-                                                                                fontSize: 30,
-                                                                                fontWeight: FontWeight.bold),
+                                                                            style:
+                                                                                GoogleFonts.abel(fontSize: 30, fontWeight: FontWeight.bold),
                                                                           ),
                                                                           const SizedBox(
                                                                             height:
                                                                                 20,
                                                                           ),
-                                                                          DropdownButton<String>(
+                                                                          DropdownButton<
+                                                                              String>(
                                                                             // isExpanded: true,
-                                                                            value: _serviceFrequencyValue,
-                                                                            icon: const Icon(Icons.arrow_downward),
-                                                                            elevation: 16,
-                                                                            style: const TextStyle(color: Colors.deepPurple),
-                                                                            underline: Container(
+                                                                            value:
+                                                                                _serviceFrequencyValue,
+                                                                            icon:
+                                                                                const Icon(Icons.arrow_downward),
+                                                                            elevation:
+                                                                                16,
+                                                                            style:
+                                                                                const TextStyle(color: Colors.deepPurple),
+                                                                            underline:
+                                                                                Container(
                                                                               height: 2,
                                                                               color: Colors.deepPurpleAccent,
                                                                             ),
-                                                                            onChanged: (String? value) {
+                                                                            onChanged:
+                                                                                (String? value) {
                                                                               // This is called when the user selects an item.
-                                                                              if(value == 'Unit'){
-                                                                                setState((){
+                                                                              if (value == 'Unit') {
+                                                                                setState(() {
                                                                                   _hideHours = true;
                                                                                 });
-                                                                              }else{
-                                                                                setState((){
+                                                                              } else {
+                                                                                setState(() {
                                                                                   _hideHours = false;
                                                                                 });
                                                                               }
@@ -2609,7 +2644,8 @@ class _BodyState extends State<Body> {
                                                                                 _hoursSpentController.text = '0';
                                                                               });
                                                                             },
-                                                                            items: _serviceFrequency.map<DropdownMenuItem<String>>((String value) {
+                                                                            items:
+                                                                                _serviceFrequency.map<DropdownMenuItem<String>>((String value) {
                                                                               return DropdownMenuItem<String>(
                                                                                 value: value,
                                                                                 child: Text(value),
@@ -2618,16 +2654,19 @@ class _BodyState extends State<Body> {
                                                                           ),
                                                                           const SizedBox(
                                                                             height:
-                                                                            20,
+                                                                                20,
                                                                           ),
                                                                           TextFormField(
-                                                                            onChanged: (value){
+                                                                            onChanged:
+                                                                                (value) {
                                                                               calculateInvoiceTotal();
                                                                             },
-                                                                            controller: _serviceChargeController,
-                                                                            maxLines: 1,
+                                                                            controller:
+                                                                                _serviceChargeController,
+                                                                            maxLines:
+                                                                                1,
                                                                             decoration:
-                                                                            InputDecoration(
+                                                                                InputDecoration(
                                                                               border: OutlineInputBorder(
                                                                                 borderRadius: BorderRadius.circular(15.0),
                                                                               ),
@@ -2638,36 +2677,37 @@ class _BodyState extends State<Body> {
                                                                               contentPadding: const EdgeInsets.all(5.0),
                                                                             ),
                                                                           ),
-                                                                          !_hideHours ? const SizedBox(
-                                                                            height:
-                                                                            20,
-                                                                          ) : Container(),
-                                                                          !_hideHours ? TextFormField(
-                                                                            onChanged: (value){
-                                                                              calculateInvoiceTotal();
-                                                                            },
-                                                                            controller:
-                                                                            _hoursSpentController,
-                                                                            maxLines:
-                                                                            1,
-                                                                            decoration:
-                                                                            InputDecoration(
-                                                                              border: OutlineInputBorder(
-                                                                                borderRadius: BorderRadius.circular(15.0),
-                                                                              ),
-                                                                              // hintText: 'Tell us about yourself',
-                                                                              labelText: 'Hours Spent',
-                                                                              labelStyle: GoogleFonts.abel(),
-                                                                              floatingLabelBehavior: FloatingLabelBehavior.always,
-                                                                              contentPadding: const EdgeInsets.all(5.0),
-                                                                            ),
-                                                                          ) : Container(),
+                                                                          !_hideHours
+                                                                              ? const SizedBox(
+                                                                                  height: 20,
+                                                                                )
+                                                                              : Container(),
+                                                                          !_hideHours
+                                                                              ? TextFormField(
+                                                                                  onChanged: (value) {
+                                                                                    calculateInvoiceTotal();
+                                                                                  },
+                                                                                  controller: _hoursSpentController,
+                                                                                  maxLines: 1,
+                                                                                  decoration: InputDecoration(
+                                                                                    border: OutlineInputBorder(
+                                                                                      borderRadius: BorderRadius.circular(15.0),
+                                                                                    ),
+                                                                                    // hintText: 'Tell us about yourself',
+                                                                                    labelText: 'Hours Spent',
+                                                                                    labelStyle: GoogleFonts.abel(),
+                                                                                    floatingLabelBehavior: FloatingLabelBehavior.always,
+                                                                                    contentPadding: const EdgeInsets.all(5.0),
+                                                                                  ),
+                                                                                )
+                                                                              : Container(),
                                                                           const SizedBox(
                                                                             height:
                                                                                 20,
                                                                           ),
                                                                           TextFormField(
-                                                                            onChanged: (value){
+                                                                            onChanged:
+                                                                                (value) {
                                                                               calculateInvoiceTotal();
                                                                             },
                                                                             controller:
@@ -2676,19 +2716,14 @@ class _BodyState extends State<Body> {
                                                                                 1,
                                                                             decoration:
                                                                                 InputDecoration(
-                                                                              border:
-                                                                                  OutlineInputBorder(
+                                                                              border: OutlineInputBorder(
                                                                                 borderRadius: BorderRadius.circular(15.0),
                                                                               ),
                                                                               // hintText: 'Tell us about yourself',
-                                                                              labelText:
-                                                                                  'Visiting Fee',
-                                                                              labelStyle:
-                                                                                  GoogleFonts.abel(),
-                                                                              floatingLabelBehavior:
-                                                                                  FloatingLabelBehavior.always,
-                                                                              contentPadding:
-                                                                                  const EdgeInsets.all(5.0),
+                                                                              labelText: 'Visiting Fee',
+                                                                              labelStyle: GoogleFonts.abel(),
+                                                                              floatingLabelBehavior: FloatingLabelBehavior.always,
+                                                                              contentPadding: const EdgeInsets.all(5.0),
                                                                             ),
                                                                           ),
                                                                           const SizedBox(
@@ -2696,7 +2731,8 @@ class _BodyState extends State<Body> {
                                                                                 20,
                                                                           ),
                                                                           TextFormField(
-                                                                            onChanged: (value){
+                                                                            onChanged:
+                                                                                (value) {
                                                                               calculateInvoiceTotal();
                                                                             },
                                                                             controller:
@@ -2705,33 +2741,26 @@ class _BodyState extends State<Body> {
                                                                                 1,
                                                                             decoration:
                                                                                 InputDecoration(
-                                                                              border:
-                                                                                  OutlineInputBorder(
+                                                                              border: OutlineInputBorder(
                                                                                 borderRadius: BorderRadius.circular(15.0),
                                                                               ),
                                                                               // hintText: 'Tell us about yourself',
-                                                                              labelText:
-                                                                                  'Discount Percentage',
-                                                                              labelStyle:
-                                                                                  GoogleFonts.abel(),
-                                                                              floatingLabelBehavior:
-                                                                                  FloatingLabelBehavior.always,
-                                                                              contentPadding:
-                                                                                  const EdgeInsets.all(5.0),
+                                                                              labelText: 'Discount Percentage',
+                                                                              labelStyle: GoogleFonts.abel(),
+                                                                              floatingLabelBehavior: FloatingLabelBehavior.always,
+                                                                              contentPadding: const EdgeInsets.all(5.0),
                                                                             ),
                                                                           ),
                                                                           CheckboxListTile(
                                                                             title:
                                                                                 Text(
                                                                               "GST Applicable",
-                                                                              style:
-                                                                                  GoogleFonts.abel(),
+                                                                              style: GoogleFonts.abel(),
                                                                             ),
                                                                             subtitle:
                                                                                 Text(
                                                                               "10%",
-                                                                              style:
-                                                                                  GoogleFonts.sourceCodePro(color: Colors.green),
+                                                                              style: GoogleFonts.sourceCodePro(color: Colors.green),
                                                                             ),
                                                                             value: _hasTax
                                                                                 ? true
@@ -2754,14 +2783,12 @@ class _BodyState extends State<Body> {
                                                                             title:
                                                                                 Text(
                                                                               "Card Processing Applicable",
-                                                                              style:
-                                                                                  GoogleFonts.abel(),
+                                                                              style: GoogleFonts.abel(),
                                                                             ),
                                                                             subtitle:
                                                                                 Text(
                                                                               "2.5% fee",
-                                                                              style:
-                                                                                  GoogleFonts.sourceCodePro(color: Colors.green),
+                                                                              style: GoogleFonts.sourceCodePro(color: Colors.green),
                                                                             ),
                                                                             value: _hasCardProcessing
                                                                                 ? true
@@ -2793,17 +2820,13 @@ class _BodyState extends State<Body> {
                                                                                 1,
                                                                             decoration:
                                                                                 InputDecoration(
-                                                                              border:
-                                                                                  OutlineInputBorder(
+                                                                              border: OutlineInputBorder(
                                                                                 borderRadius: BorderRadius.circular(15.0),
                                                                               ),
                                                                               // hintText: 'Tell us about yourself',
-                                                                              labelText:
-                                                                                  'Total Amount',
-                                                                              floatingLabelBehavior:
-                                                                                  FloatingLabelBehavior.always,
-                                                                              contentPadding:
-                                                                                  const EdgeInsets.all(5.0),
+                                                                              labelText: 'Total Amount',
+                                                                              floatingLabelBehavior: FloatingLabelBehavior.always,
+                                                                              contentPadding: const EdgeInsets.all(5.0),
                                                                             ),
                                                                           ),
                                                                           const SizedBox(
@@ -2817,29 +2840,21 @@ class _BodyState extends State<Body> {
                                                                                 40.0,
                                                                             child:
                                                                                 ElevatedButton.icon(
-                                                                              icon:
-                                                                                  const Icon(
+                                                                              icon: const Icon(
                                                                                 Icons.save,
                                                                                 color: Colors.white,
                                                                               ),
-                                                                              label:
-                                                                                  Text(
+                                                                              label: Text(
                                                                                 "Save",
                                                                                 style: GoogleFonts.aBeeZee(color: Colors.white),
                                                                               ),
-                                                                              onPressed:
-                                                                                  () async {
+                                                                              onPressed: () async {
                                                                                 EasyLoading.show();
                                                                                 EasyLoading.dismiss();
-                                                                                createAnInvoice(
-                                                                                  jobId: dataSnapshot.data!.data!.appointmentsFollowUps![index].commentsJobId,
-                                                                                  followupId: dataSnapshot.data!.data!.followUps![index].followUpsId,
-                                                                                  module: 'appointments'
-                                                                                );
+                                                                                createAnInvoice(jobId: dataSnapshot.data!.data!.appointmentsFollowUps![index].commentsJobId, followupId: dataSnapshot.data!.data!.followUps![index].followUpsId, module: 'appointments');
                                                                                 Navigator.of(context).pop();
                                                                               },
-                                                                              style:
-                                                                                  ElevatedButton.styleFrom(
+                                                                              style: ElevatedButton.styleFrom(
                                                                                 backgroundColor: Colors.green,
                                                                                 shape: RoundedRectangleBorder(
                                                                                   borderRadius: BorderRadius.circular(32.0),
@@ -2849,7 +2864,7 @@ class _BodyState extends State<Body> {
                                                                           ),
                                                                           const SizedBox(
                                                                             height:
-                                                                            50,
+                                                                                50,
                                                                           ),
                                                                           GestureDetector(
                                                                             onTap:
@@ -2887,29 +2902,24 @@ class _BodyState extends State<Body> {
                                                                                                           children: [
                                                                                                             Row(
                                                                                                               children: [
-                                                                                                                const Expanded(
-                                                                                                                    child: AutoSizeText("Invoice Number")
-                                                                                                                ),
+                                                                                                                const Expanded(child: AutoSizeText("Invoice Number")),
                                                                                                                 Expanded(
-                                                                                                                  child: AutoSizeText("${invoiceSnapshot.data.data[index].id}", style: GoogleFonts.abyssinicaSil(fontSize: 20),),
+                                                                                                                  child: AutoSizeText(
+                                                                                                                    "${invoiceSnapshot.data.data[index].id}",
+                                                                                                                    style: GoogleFonts.abyssinicaSil(fontSize: 20),
+                                                                                                                  ),
                                                                                                                 ),
                                                                                                               ],
                                                                                                             ),
                                                                                                             Row(
                                                                                                               children: [
-                                                                                                                const Expanded(
-                                                                                                                    child: AutoSizeText("Frequency")
-                                                                                                                ),
-                                                                                                                Expanded(
-                                                                                                                    child: AutoSizeText(invoiceSnapshot.data.data[index].callChargeFrequency != null ? StringUtils.capitalize(invoiceSnapshot.data.data[index].callChargeFrequency) : '-')
-                                                                                                                ),
+                                                                                                                const Expanded(child: AutoSizeText("Frequency")),
+                                                                                                                Expanded(child: AutoSizeText(invoiceSnapshot.data.data[index].callChargeFrequency != null ? StringUtils.capitalize(invoiceSnapshot.data.data[index].callChargeFrequency) : '-')),
                                                                                                               ],
                                                                                                             ),
                                                                                                             Row(
                                                                                                               children: [
-                                                                                                                const Expanded(
-                                                                                                                    child: AutoSizeText("Service Charge")
-                                                                                                                ),
+                                                                                                                const Expanded(child: AutoSizeText("Service Charge")),
                                                                                                                 Expanded(
                                                                                                                   child: AutoSizeText("${invoiceSnapshot.data.data[index].hourlyServiceCharge ?? 0}"),
                                                                                                                 ),
@@ -2917,9 +2927,7 @@ class _BodyState extends State<Body> {
                                                                                                             ),
                                                                                                             Row(
                                                                                                               children: [
-                                                                                                                const Expanded(
-                                                                                                                    child: AutoSizeText("Hours")
-                                                                                                                ),
+                                                                                                                const Expanded(child: AutoSizeText("Hours")),
                                                                                                                 Expanded(
                                                                                                                   child: AutoSizeText("${invoiceSnapshot.data.data[index].hours ?? 0}"),
                                                                                                                 ),
@@ -2927,9 +2935,7 @@ class _BodyState extends State<Body> {
                                                                                                             ),
                                                                                                             Row(
                                                                                                               children: [
-                                                                                                                const Expanded(
-                                                                                                                    child: AutoSizeText("Visiting Fee ")
-                                                                                                                ),
+                                                                                                                const Expanded(child: AutoSizeText("Visiting Fee ")),
                                                                                                                 Expanded(
                                                                                                                   child: AutoSizeText("${invoiceSnapshot.data.data[index].visitingFee ?? 0}"),
                                                                                                                 ),
@@ -2937,9 +2943,7 @@ class _BodyState extends State<Body> {
                                                                                                             ),
                                                                                                             Row(
                                                                                                               children: [
-                                                                                                                const Expanded(
-                                                                                                                    child: AutoSizeText("Discount")
-                                                                                                                ),
+                                                                                                                const Expanded(child: AutoSizeText("Discount")),
                                                                                                                 Expanded(
                                                                                                                   child: AutoSizeText("${invoiceSnapshot.data.data[index].discount ?? 0} %"),
                                                                                                                 ),
@@ -2947,9 +2951,7 @@ class _BodyState extends State<Body> {
                                                                                                             ),
                                                                                                             Row(
                                                                                                               children: [
-                                                                                                                const Expanded(
-                                                                                                                    child: AutoSizeText("GST")
-                                                                                                                ),
+                                                                                                                const Expanded(child: AutoSizeText("GST")),
                                                                                                                 Expanded(
                                                                                                                   child: AutoSizeText("${invoiceSnapshot.data.data[index].gst ?? 0} %"),
                                                                                                                 ),
@@ -2957,9 +2959,7 @@ class _BodyState extends State<Body> {
                                                                                                             ),
                                                                                                             Row(
                                                                                                               children: [
-                                                                                                                const Expanded(
-                                                                                                                    child: AutoSizeText("Card Processing Fee")
-                                                                                                                ),
+                                                                                                                const Expanded(child: AutoSizeText("Card Processing Fee")),
                                                                                                                 Expanded(
                                                                                                                   child: AutoSizeText("${invoiceSnapshot.data.data[index].cardProcessingFee ?? 0} %"),
                                                                                                                 ),
@@ -2968,16 +2968,18 @@ class _BodyState extends State<Body> {
                                                                                                             Row(
                                                                                                               children: [
                                                                                                                 Expanded(
-                                                                                                                    child: AutoSizeText("Total Amount", style: GoogleFonts.abyssinicaSil(fontSize: 20),)
-                                                                                                                ),
+                                                                                                                    child: AutoSizeText(
+                                                                                                                  "Total Amount",
+                                                                                                                  style: GoogleFonts.abyssinicaSil(fontSize: 20),
+                                                                                                                )),
                                                                                                                 Expanded(
-                                                                                                                  child: AutoSizeText("${invoiceSnapshot.data.data[index].totalAmount ?? 0}", style: GoogleFonts.abyssinicaSil(fontSize: 20),),
+                                                                                                                  child: AutoSizeText(
+                                                                                                                    "${invoiceSnapshot.data.data[index].totalAmount ?? 0}",
+                                                                                                                    style: GoogleFonts.abyssinicaSil(fontSize: 20),
+                                                                                                                  ),
                                                                                                                 ),
                                                                                                               ],
                                                                                                             ),
-
-
-
                                                                                                           ],
                                                                                                         ),
                                                                                                       ),
@@ -2990,15 +2992,15 @@ class _BodyState extends State<Body> {
                                                                               );
                                                                             },
                                                                             child:
-                                                                            AutoSizeText(
+                                                                                AutoSizeText(
                                                                               "View Invoices",
                                                                               style: GoogleFonts.abel(fontSize: 25, fontWeight: FontWeight.bold),
                                                                             ),
                                                                           ),
                                                                         ],
+                                                                      ),
                                                                     ),
-                                                                  ),
-                                                                      ));
+                                                                  ));
                                                             }));
                                                   },
                                                   child: Icon(
